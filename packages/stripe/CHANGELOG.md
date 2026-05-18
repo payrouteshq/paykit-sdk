@@ -1,5 +1,13 @@
 # @paykit-sdk/stripe
 
+## 1.1.106
+
+### Patch Changes
+
+- c43ab89: fix: make webhooksecret and customer phone nullable, medusa adapter improvements and more
+- Updated dependencies [c43ab89]
+  - @paykit-sdk/core@1.1.104
+
 ## 1.1.105
 
 ### Patch Changes

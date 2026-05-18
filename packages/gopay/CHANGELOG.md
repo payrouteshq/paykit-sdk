@@ -1,5 +1,13 @@
 # @paykit-sdk/gopay
 
+## 1.1.5
+
+### Patch Changes
+
+- c43ab89: fix: make webhooksecret and customer phone nullable, medusa adapter improvements and more
+- Updated dependencies [c43ab89]
+  - @paykit-sdk/core@1.1.104
+
 ## 1.1.4
 
 ### Patch Changes
