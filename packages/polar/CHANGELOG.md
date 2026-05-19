@@ -1,5 +1,13 @@
 # @paykit-sdk/polar
 
+## 1.1.101
+
+### Patch Changes
+
+- c43ab89: fix: make webhooksecret and customer phone nullable, medusa adapter improvements and more
+- Updated dependencies [c43ab89]
+  - @paykit-sdk/core@1.1.104
+
 ## 1.1.100
 
 ### Patch Changes

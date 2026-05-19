@@ -1,5 +1,13 @@
 # @paykit-sdk/comgate
 
+## 1.0.10
+
+### Patch Changes
+
+- c43ab89: fix: make webhooksecret and customer phone nullable, medusa adapter improvements and more
+- Updated dependencies [c43ab89]
+  - @paykit-sdk/core@1.1.104
+
 ## 1.0.9
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @paykit-sdk/core
 
+## 1.1.104
+
+### Patch Changes
+
+- c43ab89: fix: make webhooksecret and customer phone nullable, medusa adapter improvements and more
+
 ## 1.1.103
 
 ### Patch Changes
