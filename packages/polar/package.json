@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/polar",
-  "version": "1.1.100",
+  "version": "2.0.0",
   "description": "Polar provider for PayKit",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -26,7 +26,7 @@
     "@polar-sh/sdk": "0.37.0"
   },
   "peerDependencies": {
-    "@paykit-sdk/core": ">=1.1.103"
+    "@paykit-sdk/core": ">=1.2.0"
   },
   "devDependencies": {
     "@paykit-sdk/core": "workspace:*",

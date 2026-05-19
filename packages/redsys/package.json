@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/redsys",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Redsys inSite provider for PayKit",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -27,7 +27,7 @@
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@paykit-sdk/core": ">=1.1.103"
+    "@paykit-sdk/core": ">=1.2.0"
   },
   "devDependencies": {
     "@paykit-sdk/core": "workspace:*",

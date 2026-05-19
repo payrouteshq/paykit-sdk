@@ -1,5 +1,11 @@
 # @paykit-sdk/core
 
+## 1.2.0
+
+### Minor Changes
+
+- 5c258a2: feat: setup telemetry
+
 ## 1.1.103
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/react",
-  "version": "1.1.97",
+  "version": "2.0.0",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -25,7 +25,7 @@
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
-    "@paykit-sdk/core": ">=1.1.103"
+    "@paykit-sdk/core": ">=1.2.0"
   },
   "devDependencies": {
     "@swc/core": "^1.12.9",
