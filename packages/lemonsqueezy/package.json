@@ -1,0 +1,35 @@
+{
+  "name": "@paykit-sdk/lemonsqueezy",
+  "version": "0.1.0",
+  "description": "Lemon Squeezy provider for PayKit",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "paykit": { "type": "provider" },
+  "scripts": { "build": "tsup" },
+  "keywords": [],
+  "license": "ISC",
+  "author": "Kevin Castro",
+  "peerDependencies": {
+    "@paykit-sdk/core": ">=1.2.0"
+  },
+  "devDependencies": {
+    "@paykit-sdk/core": "workspace:*",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
+  },
+  "publishConfig": { "access": "public" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/payrouteshq/paykit-sdk.git"
+  },
+  "bugs": { "url": "https://github.com/payrouteshq/paykit-sdk/issues" }
+}
