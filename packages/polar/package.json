@@ -26,7 +26,7 @@
     "@polar-sh/sdk": "0.37.0"
   },
   "peerDependencies": {
-    "@paykit-sdk/core": ">=1.2.0"
+    "@paykit-sdk/core": ">=1.2.3"
   },
   "devDependencies": {
     "@paykit-sdk/core": "workspace:*",

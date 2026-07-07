@@ -12,7 +12,7 @@
   "author": "Emmanuel Odii",
   "license": "ISC",
   "peerDependencies": {
-    "@paykit-sdk/core": ">=1.2.0"
+    "@paykit-sdk/core": ">=1.2.3"
   },
   "devDependencies": {
     "@types/node": "^24.2.0",

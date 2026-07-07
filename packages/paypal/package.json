@@ -32,7 +32,7 @@
     "esbuild": "^0.25.11"
   },
   "peerDependencies": {
-    "@paykit-sdk/core": ">=1.2.0"
+    "@paykit-sdk/core": ">=1.2.3"
   },
   "publishConfig": {
     "access": "public"

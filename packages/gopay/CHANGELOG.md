@@ -1,5 +1,13 @@
 # @paykit-sdk/gopay
 
+## 1.2.3
+
+### Patch Changes
+
+- 5c54886: fix(gopay): correctly spread contact values in API request
+- Updated dependencies [5c54886]
+  - @paykit-sdk/core@1.2.3
+
 ## 1.1.4
 
 ### Patch Changes
