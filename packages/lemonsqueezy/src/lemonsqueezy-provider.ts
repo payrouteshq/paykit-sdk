@@ -18,10 +18,15 @@ import {
   UpdateCustomerParams,
   ValidationError,
   WebhookEventPayload,
+  Payment,
+  CreatePaymentSchema,
   WebhookHandlerConfig,
 } from '@paykit-sdk/core';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { z } from 'zod';
+import type { LemonSqueezyCustomer, LemonSqueezySubscription } from './lemonsqueezy-types';
+import { mapEventType } from './lemonsqueezy-types';
+import { mapCustomerToPaykit, mapSubscriptionToPaykit } from './lemonsqueezy-mappers';
 
 interface LemonSqueezyMetadata extends ProviderMetadataRegistry {}
 
@@ -51,9 +56,9 @@ const providerName = 'lemonsqueezy';
 
 export class LemonSqueezyProvider
   extends AbstractPayKitProvider
-  implements PayKitProvider<LemonSqueezyMetadata, any, LemonSqueezyRawEvents>
+  implements PayKitProvider<LemonSqueezyMetadata, unknown, LemonSqueezyRawEvents>
 {
-  private _client: HTTPClient;
+  private _client: HTTPClient; 
   readonly providerName = providerName;
   readonly isSandbox: boolean;
 
@@ -147,17 +152,37 @@ export class LemonSqueezyProvider
   };
 
   retrieveCustomer = async (id: string): Promise<Customer> => {
-    const res = await this._client.get<Record<string, unknown>>(`/customers/${id}`);
+    const res = await this._client.get<LemonSqueezyCustomer>(`/customers/${id}`);
     if (!res.ok) throw new Error('Failed to retrieve Lemon Squeezy customer');
-    return res.value as unknown as Customer;
+    return mapCustomerToPaykit(res.value);
   };
-
   updateCustomer = (id: string, params: UpdateCustomerParams): Promise<Customer> =>
     this._ni('updateCustomer');
   deleteCustomer = (id: string): Promise<null> => this._ni('deleteCustomer');
 
-  // Lemon Squeezy has no standalone Payment resource distinct from Orders — flag it honestly
-  createPayment = () => this._ns('createPayment', 'Use createCheckout; Lemon Squeezy settles via checkout + order webhooks.');
+ // Lemon Squeezy has no standalone Payment resource — a "payment" is really a checkout.
+  // NOTE: CreatePaymentSchema and CreateCheckoutSchema are structurally different
+  // (checkout needs products/session_type; payment doesn't have them), so this cast
+  // is a known gap — flag it to devodii rather than treating it as settled.
+  createPayment = async (
+    params: CreatePaymentSchema<LemonSqueezyMetadata['payment']>,
+  ): Promise<Payment> => {
+    const checkout = await this.createCheckout(
+      params as unknown as CreateCheckoutSchema<LemonSqueezyMetadata['checkout']>,
+    );
+
+    return {
+      id: checkout.id,
+      amount: checkout.amount,
+      currency: checkout.currency,
+      customer: checkout.customer,
+      status: 'pending', // becomes final once the order_created webhook fires
+      metadata: checkout.metadata ?? {},
+      item_id: params.item_id ?? null,
+      requires_action: false,
+      payment_url: checkout.payment_url,
+    };
+  };
   retrievePayment = () => this._ni('retrievePayment');
   updatePayment = () => this._ni('updatePayment');
   deletePayment = () => this._ni('deletePayment');
@@ -166,9 +191,9 @@ export class LemonSqueezyProvider
 
   createSubscription = () => this._ni('createSubscription');
   retrieveSubscription = async (id: string) => {
-    const res = await this._client.get<Record<string, unknown>>(`/subscriptions/${id}`);
+    const res = await this._client.get<LemonSqueezySubscription>(`/subscriptions/${id}`);
     if (!res.ok) throw new Error('Failed to retrieve subscription');
-    return res.value as any;
+    return mapSubscriptionToPaykit(res.value);
   };
   updateSubscription = () => this._ni('updateSubscription');
   deleteSubscription = () => this._ni('deleteSubscription');
@@ -211,7 +236,8 @@ export class LemonSqueezyProvider
     return [
       {
         id: event.data?.id,
-        type: `lemonsqueezy.${eventName}` as any,
+        type: mapEventType(eventName),
+        rawType: `lemonsqueezy.${eventName}`,
         data: event.data,
       },
     ];
