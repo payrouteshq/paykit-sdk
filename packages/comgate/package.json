@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/comgate",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Comgate provider for PayKit",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
