@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/monnify",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Moniepoint provider for PayKit",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -27,7 +27,7 @@
   "license": "ISC",
   "author": "Emmanuel Odii",
   "peerDependencies": {
-    "@paykit-sdk/core": ">=1.2.3"
+    "@paykit-sdk/core": ">=1.3.0"
   },
   "devDependencies": {
     "@paykit-sdk/core": "workspace:*",

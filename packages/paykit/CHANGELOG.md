@@ -1,5 +1,11 @@
 # @paykit-sdk/core
 
+## 1.3.0
+
+### Minor Changes
+
+- c638e54: chore: bump provider versions
+
 ## 1.2.3
 
 ### Patch Changes

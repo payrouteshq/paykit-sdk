@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/stripe",
-  "version": "1.2.3",
+  "version": "2.0.0",
   "description": "Stripe provider for PayKit",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -28,7 +28,7 @@
     "stripe": "^22.3.1"
   },
   "peerDependencies": {
-    "@paykit-sdk/core": ">=1.2.3"
+    "@paykit-sdk/core": ">=1.3.0"
   },
   "devDependencies": {
     "@paykit-sdk/core": "workspace:*",
