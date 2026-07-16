@@ -1,5 +1,11 @@
 # @paykit-sdk/core
 
+## 2.0.0
+
+### Major Changes
+
+- c4e7f31: feat: major upgrades for all providers
+
 ## 1.3.3
 
 ### Patch Changes
