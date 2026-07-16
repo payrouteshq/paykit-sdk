@@ -18,6 +18,7 @@ import { Customer } from '@polar-sh/sdk/models/components/customer';
 import { Order } from '@polar-sh/sdk/models/components/order';
 import { Refund } from '@polar-sh/sdk/models/components/refund.js';
 import { Subscription } from '@polar-sh/sdk/models/components/subscription';
+import { SubscriptionBillingInterval } from '@paykit-sdk/core';
 
 /**
  * @internal
@@ -59,7 +60,7 @@ export const Customer$inboundSchema = (
 
   return {
     id: customer.id,
-    email: customer.email,
+    email: customer.email ?? '',
     name: customer.name ?? '',
     phone,
     metadata: omitInternalMetadata(customer.metadata ?? {}),
@@ -108,7 +109,8 @@ export const Subscription$inboundSchema = (
     metadata: omitInternalMetadata(subscription.metadata ?? {}),
     custom_fields: subscription.customFieldData ?? null,
     item_id: subscription.productId,
-    billing_interval: subscription.recurringInterval,
+    billing_interval:
+      subscription.recurringInterval as SubscriptionBillingInterval,
     currency: subscription.currency,
     amount: subscription.amount,
     requires_action: false,

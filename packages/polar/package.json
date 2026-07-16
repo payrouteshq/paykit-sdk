@@ -25,15 +25,15 @@
   "author": "Emmanuel Odii",
   "license": "ISC",
   "dependencies": {
-    "@polar-sh/sdk": "0.37.0"
+    "@polar-sh/sdk": "0.48.1"
   },
   "peerDependencies": {
     "@paykit-sdk/core": "^1.2.3"
   },
   "devDependencies": {
     "@paykit-sdk/core": "workspace:*",
-    "tsup": "^8.0.0",
-    "typescript": "^5.0.0"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.2"
   },
   "publishConfig": {
     "access": "public"

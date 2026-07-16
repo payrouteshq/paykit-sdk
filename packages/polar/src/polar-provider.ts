@@ -50,17 +50,15 @@ import {
   WebhookError,
 } from '@paykit-sdk/core';
 import { Polar, SDKOptions, ServerList } from '@polar-sh/sdk';
-import { CountryAlpha2Input } from '@polar-sh/sdk/models/components/addressinput.js';
+import { AddressInputCountryAlpha2Input } from '@polar-sh/sdk/models/components/addressinput.js';
 import { CheckoutCreate } from '@polar-sh/sdk/models/components/checkoutcreate.js';
 import { Customer as PolarCustomer } from '@polar-sh/sdk/models/components/customer.js';
 import { Order as PolarOrder } from '@polar-sh/sdk/models/components/order.js';
+import { PresentmentCurrency } from '@polar-sh/sdk/models/components/presentmentcurrency.js';
 import { Refund as PolarRefund } from '@polar-sh/sdk/models/components/refund.js';
 import { RefundReason } from '@polar-sh/sdk/models/components/refundreason.js';
 import { Subscription as PolarSubscription } from '@polar-sh/sdk/models/components/subscription.js';
-import { SubscriptionUpdate } from '@polar-sh/sdk/models/components/subscriptionupdate.js';
-import { SubscriptionUpdateDiscount } from '@polar-sh/sdk/models/components/subscriptionupdatediscount.js';
-import { SubscriptionUpdateProduct } from '@polar-sh/sdk/models/components/subscriptionupdateproduct.js';
-import { SubscriptionUpdateTrial } from '@polar-sh/sdk/models/components/subscriptionupdatetrial.js';
+import { SubscriptionUpdateBase } from '@polar-sh/sdk/models/components/subscriptionupdatebase.js';
 import { Refunds } from '@polar-sh/sdk/sdk/refunds.js';
 import { validateEvent } from '@polar-sh/sdk/webhooks';
 import {
@@ -132,14 +130,6 @@ export class PolarProvider
     return this.polar;
   }
 
-  /**
-   * Checkout management
-   */
-  /**
-   * Polar's checkoutCreateOptions accepts the customer as either
-   * customerId or customerEmail, regardless of whether the checkout
-   * originates from createCheckout or createPayment.
-   */
   private applyCustomer(
     options: CheckoutCreate,
     customer: unknown,
@@ -183,7 +173,8 @@ export class PolarProvider
         line2: data.billing.address.line2,
         postalCode: data.billing.address.postal_code,
         city: data.billing.address.city,
-        country: data.billing.address.country as CountryAlpha2Input,
+        country: data.billing.address
+          .country as AddressInputCountryAlpha2Input,
         state: data.billing.address.state,
       };
 
@@ -414,7 +405,6 @@ export class PolarProvider
       );
     }
 
-    // Polar requires specific update types via provider_metadata
     if (
       !data.provider_metadata ||
       Object.keys(data.provider_metadata).length === 0
@@ -428,12 +418,8 @@ export class PolarProvider
 
     const response = await this.polar.subscriptions.update({
       id,
-      subscriptionUpdate: data.provider_metadata as Extract<
-        SubscriptionUpdate,
-        | SubscriptionUpdateProduct
-        | SubscriptionUpdateDiscount
-        | SubscriptionUpdateTrial
-      >,
+      subscriptionUpdate:
+        data.provider_metadata as SubscriptionUpdateBase,
     });
 
     return Subscription$inboundSchema(response);
@@ -485,7 +471,8 @@ export class PolarProvider
         line2: data.billing.address.line2,
         postalCode: data.billing.address.postal_code,
         city: data.billing.address.city,
-        country: data.billing.address.country as CountryAlpha2Input,
+        country: data.billing.address
+          .country as AddressInputCountryAlpha2Input,
         state: data.billing.address.state,
       };
 
@@ -532,7 +519,10 @@ export class PolarProvider
         ...(rest.metadata && { metadata: paymentMetadata }),
         ...(rest.item_id && { products: [rest.item_id] }),
         ...(rest.amount && { amount: rest.amount }),
-        ...(rest.currency && { currency: rest.currency }),
+        ...(rest.currency && {
+          currency:
+            rest.currency.toLowerCase() as PresentmentCurrency,
+        }),
       },
     });
 
@@ -703,7 +693,8 @@ export class PolarProvider
                 metadata: stringifyMetadataValues(
                   polarOrder.metadata ?? {},
                 ),
-                item_id: polarOrder.product.id,
+                item_id:
+                  polarOrder.product?.id ?? polarOrder.productId,
                 requires_action: false,
                 payment_url: null,
               },
@@ -746,7 +737,8 @@ export class PolarProvider
                 metadata: stringifyMetadataValues(
                   polarOrder.metadata ?? {},
                 ),
-                item_id: polarOrder.product.id,
+                item_id:
+                  polarOrder.product?.id ?? polarOrder.productId,
                 requires_action: polarOrder.status !== 'paid',
                 payment_url: null,
               },

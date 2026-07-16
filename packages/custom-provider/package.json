@@ -15,8 +15,8 @@
     "@paykit-sdk/core": ">=1.2.3"
   },
   "devDependencies": {
-    "@types/node": "^24.2.0",
-    "tsup": "^8.5.0",
+    "@types/node": "^26.1.1",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.2",
     "@paykit-sdk/core": "workspace:*",
     "zod": "^3.24.2"
