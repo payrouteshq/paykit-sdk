@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/lemonsqueezy",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LemonSqueezy provider for PayKit",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

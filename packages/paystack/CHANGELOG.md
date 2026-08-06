@@ -1,5 +1,13 @@
 # @paykit-sdk/paystack
 
+## 1.3.3
+
+### Patch Changes
+
+- 2f8ca01: fix(paystack): bypass \_toCamel when feeding API responses into provider mappers to fix undefined ids and timestamps
+  fix(paystack): use refund currency from response instead of hardcoded NGN
+  fix(paystack): throw on failed subscription disable
+
 ## 1.3.2
 
 ### Patch Changes
