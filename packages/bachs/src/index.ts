@@ -1,4 +1,4 @@
-import { validateRequiredKeys, PayKit } from '@paykit-sdk/core';
+import { validateRequiredKeys } from '@paykit-sdk/core';
 import { BachsOptions, BachsProvider } from './bachs-provider';
 
 export const createBachs = (config: BachsOptions) => {
@@ -7,15 +7,17 @@ export const createBachs = (config: BachsOptions) => {
 
 export const bachs = () => {
   const envVars = validateRequiredKeys(
-    ['BACHS_API_KEY', 'BACHS_SANDBOX'],
+    ['BACHS_API_KEY'],
     process.env as Record<string, string>,
     'Missing required environment variables: {keys}',
   );
 
-  return createBachs({
-    apiKey: envVars.BACHS_API_KEY,
-    isSandbox: envVars.BACHS_SANDBOX === 'true',
-  });
+  const apiKey = envVars.BACHS_API_KEY;
+  const isSandbox = apiKey.includes('sandbox');
+
+  return createBachs({ apiKey, isSandbox });
 };
 
 export { BachsProvider, type BachsOptions };
+
+export * from './schema';

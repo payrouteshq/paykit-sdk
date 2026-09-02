@@ -177,10 +177,15 @@ await webhook.handle({
 ```typescript
 paykit.webhooks
   .setup({ webhookSecret: process.env.BACHS_WEBHOOK_SECRET! })
-  .on('bachs.payout.paid', async event => {
-    // event.data is the raw Bachs payload
+  .on('bachs.payout.paid', async payout => {
+    // payout is the raw Bachs payload, typed as BachsPayoutEventData
+    console.log(payout.withdrawal_id, payout.status);
   });
 ```
+
+A raw handler receives the Bachs payload itself, not a PayKit event
+wrapper. Every payload type is exported from `@paykit-sdk/bachs`, along
+with the rest of the Bachs API types generated from their OpenAPI spec.
 
 All available raw events and their PayKit mappings:
 

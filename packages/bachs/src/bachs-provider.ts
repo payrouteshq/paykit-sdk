@@ -44,15 +44,21 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import {
   BachsCancelSubscriptionRequest,
   BachsCheckoutSessionApiResponse,
+  BachsCollectionFailedEventData,
+  BachsCollectionSucceededEventData,
+  BachsCollectionUnderpaidEventData,
   BachsCreateCheckoutSessionRequest,
   BachsCreateCheckoutSessionResponse,
   BachsCreateCustomerRequest,
   BachsCreateRefundRequest,
   BachsCustomerDetailResponse,
+  BachsCustomerEventData,
+  BachsEventPayloadMap,
   BachsPaymentResponse,
   BachsProductItemRequest,
-  BachsRawEvents,
+  BachsRefundEventData,
   BachsRefundResponse,
+  BachsSubscriptionEventData,
   BachsSubscriptionResponse,
   BachsUpdateCustomerRequest,
   BachsUpdateSubscriptionRequest,
@@ -106,6 +112,10 @@ interface BachsMetadata extends ProviderMetadataRegistry {
   subscription: BachsSubscriptionMetadata;
 }
 
+type PayKitBachsRawEvents = {
+  [K in keyof BachsEventPayloadMap as `bachs.${K}`]: BachsEventPayloadMap[K];
+} & Record<string, any>;
+
 export interface BachsOptions extends PaykitProviderOptions {
   /** Secret key issued by Bachs: `sk_sandbox_...` or `sk_live_...`. */
   apiKey: string;
@@ -128,7 +138,8 @@ const WEBHOOK_TOLERANCE_SECONDS = 300;
 
 export class BachsProvider
   extends AbstractPayKitProvider
-  implements PayKitProvider<BachsMetadata, HTTPClient, BachsRawEvents>
+  implements
+    PayKitProvider<BachsMetadata, HTTPClient, PayKitBachsRawEvents>
 {
   readonly providerName = providerName;
   readonly isSandbox: boolean;
@@ -710,7 +721,7 @@ export class BachsProvider
   handleWebhook = async (
     payload: WebhookHandlerConfig,
     webhookSecret: string | null,
-  ): Promise<Array<WebhookEventPayload<BachsRawEvents>>> => {
+  ): Promise<Array<WebhookEventPayload<PayKitBachsRawEvents>>> => {
     if (!webhookSecret) {
       throw new WebhookError(
         'webhookSecret is required for Bachs webhook verification',
@@ -765,10 +776,10 @@ export class BachsProvider
       });
     }
 
-    let event: BachsWebhookEnvelope;
+    let event: BachsWebhookEnvelope<unknown>;
 
     try {
-      event = JSON.parse(body) as BachsWebhookEnvelope;
+      event = JSON.parse(body) as BachsWebhookEnvelope<unknown>;
     } catch {
       throw new WebhookError(
         'Invalid webhook payload: not valid JSON',
@@ -778,7 +789,8 @@ export class BachsProvider
       );
     }
 
-    const results: Array<WebhookEventPayload<BachsRawEvents>> = [];
+    const results: Array<WebhookEventPayload<PayKitBachsRawEvents>> =
+      [];
 
     results.push({
       id: `bachs:${event.type}:${crypto.randomUUID()}`,
@@ -796,7 +808,7 @@ export class BachsProvider
   };
 
   private mapToStandardEvents = async (
-    event: BachsWebhookEnvelope,
+    event: BachsWebhookEnvelope<unknown>,
   ): Promise<Array<WebhookEventPayload> | null> => {
     const created = Math.floor(Date.now() / 1000);
     const id = `paykit:${event.type}:${crypto.randomUUID()}`;
@@ -805,7 +817,10 @@ export class BachsProvider
       case 'collection.succeeded':
       case 'collection.failed':
       case 'collection.underpaid': {
-        const data = event.data as { checkout_id?: string | null };
+        const data = event.data as
+          | BachsCollectionSucceededEventData
+          | BachsCollectionFailedEventData
+          | BachsCollectionUnderpaidEventData;
 
         if (!data.checkout_id) return null;
 
@@ -833,13 +848,7 @@ export class BachsProvider
       case 'refund.created':
       case 'refund.paid':
       case 'refund.failed': {
-        const data = event.data as {
-          refund_id: string;
-          charge_id: string;
-          requested_amount: string;
-          refunded_amount: string | null;
-          reason: string | null;
-        };
+        const data = event.data as BachsRefundEventData;
 
         const chargeResponse =
           await this._client.get<BachsPaymentResponse>(
@@ -851,20 +860,7 @@ export class BachsProvider
             ? chargeResponse.value.currency
             : 'USD';
 
-        const refund = Refund$inboundSchema(
-          {
-            refund_id: data.refund_id,
-            charge_id: data.charge_id,
-            reference: '',
-            status: 'processing',
-            requested_amount: data.requested_amount,
-            refunded_amount: data.refunded_amount,
-            reason: data.reason,
-            created_at: event.created_at,
-            updated_at: event.created_at,
-          },
-          currency,
-        );
+        const refund = Refund$inboundSchema(data, currency);
 
         return [
           paykitEvent$InboundSchema({
@@ -879,7 +875,7 @@ export class BachsProvider
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
-        const data = event.data as { subscription_id?: string };
+        const data = event.data as BachsSubscriptionEventData;
 
         if (!data.subscription_id) return null;
 
@@ -906,8 +902,7 @@ export class BachsProvider
 
       case 'customer.created':
       case 'customer.updated': {
-        const data =
-          event.data as unknown as BachsCustomerDetailResponse;
+        const data = event.data as BachsCustomerEventData;
 
         if (!data.customer_id) return null;
 

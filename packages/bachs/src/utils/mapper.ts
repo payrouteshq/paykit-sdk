@@ -55,13 +55,13 @@ export const bachsCheckoutStatusToPaymentStatus = (
   status: BachsCheckoutStatus,
 ): Payment['status'] => {
   switch (status) {
-    case 'OPEN':
+    case 'open':
       return 'pending';
-    case 'COMPLETED':
+    case 'completed':
       return 'succeeded';
-    case 'EXPIRED':
+    case 'expired':
       return 'failed';
-    case 'CANCELLED':
+    case 'cancelled':
       return 'canceled';
     default:
       return 'pending';
@@ -273,7 +273,10 @@ export const Subscription$inboundSchema = (
 };
 
 export const Refund$inboundSchema = (
-  data: BachsRefundResponse,
+  data: Pick<
+    BachsRefundResponse,
+    'refund_id' | 'requested_amount' | 'refunded_amount' | 'reason'
+  >,
   currency: string,
 ): Refund => ({
   id: data.refund_id,
