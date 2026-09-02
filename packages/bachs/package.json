@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/bachs",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Bachs provider for PayKit",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
