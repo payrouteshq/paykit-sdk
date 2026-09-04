@@ -1,6 +1,6 @@
 {
   "name": "@paykit-sdk/redsys",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Redsys inSite provider for PayKit",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

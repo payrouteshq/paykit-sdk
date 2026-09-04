@@ -1,5 +1,11 @@
 # @paykit-sdk/bachs
 
+## 2.0.4
+
+### Patch Changes
+
+- afd9941: fix: derive deterministic webhook event ids from payload content instead of random uuids so retries dedupe correctly
+
 ## 2.0.3
 
 ### Patch Changes

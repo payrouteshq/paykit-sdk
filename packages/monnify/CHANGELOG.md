@@ -1,5 +1,11 @@
 # @paykit-sdk/monnify
 
+## 1.3.4
+
+### Patch Changes
+
+- afd9941: fix: derive deterministic webhook event ids from payload content instead of random uuids so retries dedupe correctly
+
 ## 1.3.3
 
 ### Patch Changes
