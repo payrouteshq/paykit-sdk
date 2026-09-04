@@ -1,5 +1,11 @@
 # @paykit-sdk/remita
 
+## 2.0.2
+
+### Patch Changes
+
+- afd9941: fix: derive deterministic webhook event ids from payload content instead of random uuids so retries dedupe correctly
+
 ## 2.0.1
 
 ### Patch Changes

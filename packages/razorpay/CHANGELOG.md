@@ -1,5 +1,11 @@
 # @paykit-sdk/razorpay
 
+## 1.0.3
+
+### Patch Changes
+
+- afd9941: fix: derive deterministic webhook event ids from payload content instead of random uuids so retries dedupe correctly
+
 ## 1.0.2
 
 ### Patch Changes
