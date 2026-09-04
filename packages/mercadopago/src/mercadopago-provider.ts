@@ -32,6 +32,7 @@ import {
   createPaymentSchema,
   createRefundSchema,
   createSubscriptionSchema,
+  hashWebhookPayload,
   isEmailCustomer,
   parseCustomerName,
   paykitEvent$InboundSchema,
@@ -775,8 +776,10 @@ export class MercadoPagoProvider
     const results: Array<WebhookEventPayload<MercadoPagoRawEvents>> =
       [];
 
+    const contentHash = hashWebhookPayload(event.action, body);
+
     results.push({
-      id: `mercadopago:${event.action}:${crypto.randomUUID()}`,
+      id: `mercadopago:${event.action}:${contentHash}`,
       type: `mercadopago.${event.action}`,
       created: Math.floor(
         new Date(event.date_created).getTime() / 1000,
@@ -785,7 +788,10 @@ export class MercadoPagoProvider
       is_raw: true,
     });
 
-    const standardEvents = await this.mapToStandardEvents(event);
+    const standardEvents = await this.mapToStandardEvents(
+      event,
+      contentHash,
+    );
 
     if (standardEvents) results.push(...standardEvents);
 
@@ -829,11 +835,12 @@ export class MercadoPagoProvider
 
   private mapToStandardEvents = async (
     event: MercadoPagoWebhookEvent,
+    contentHash: string,
   ): Promise<Array<WebhookEventPayload> | null> => {
     const created = Math.floor(
       new Date(event.date_created).getTime() / 1000,
     );
-    const id = `paykit:${event.action}:${crypto.randomUUID()}`;
+    const id = `paykit:${event.action}:${contentHash}`;
 
     if (event.type === 'payment') {
       const response = await this._client.get<MercadoPagoPayment>(

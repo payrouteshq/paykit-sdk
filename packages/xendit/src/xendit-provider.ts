@@ -33,6 +33,7 @@ import {
   createPaymentSchema,
   createRefundSchema,
   createSubscriptionSchema,
+  hashWebhookPayload,
   isEmailCustomer,
   isIdCustomer,
   parseCustomerName,
@@ -704,15 +705,21 @@ export class XenditProvider
           new Date((event as XenditInvoice).updated).getTime() / 1000,
         );
 
+    const contentHash = hashWebhookPayload(rawType, body);
+
     results.push({
-      id: `xendit:${rawType}:${crypto.randomUUID()}`,
+      id: `xendit:${rawType}:${contentHash}`,
       type: rawType as keyof XenditRawEvents,
       created,
       data: event as any,
       is_raw: true,
     });
 
-    const standardEvents = this.mapToStandardEvents(event, created);
+    const standardEvents = this.mapToStandardEvents(
+      event,
+      created,
+      contentHash,
+    );
 
     if (standardEvents) results.push(...standardEvents);
 
@@ -739,8 +746,9 @@ export class XenditProvider
   private mapToStandardEvents = (
     event: XenditWebhookEvent,
     created: number,
+    contentHash: string,
   ): Array<WebhookEventPayload> | null => {
-    const id = `paykit:${crypto.randomUUID()}`;
+    const id = `paykit:${contentHash}`;
 
     if (isXenditRecurringWebhookEvent(event)) {
       if (event.event === 'recurring.plan.activated') {

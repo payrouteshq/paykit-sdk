@@ -32,6 +32,7 @@ import {
   createCustomerSchema,
   createPaymentSchema,
   createRefundSchema,
+  hashWebhookPayload,
   isEmailCustomer,
   isIdCustomer,
   parseCustomerName,
@@ -766,15 +767,17 @@ export class PaystackProvider
 
     const results: Array<WebhookEventPayload<PaystackRawEvents>> = [];
 
+    const contentHash = hashWebhookPayload(event.event, body);
+
     results.push({
-      id: `paystack:${event.event}:${crypto.randomUUID()}`,
+      id: `paystack:${event.event}:${contentHash}`,
       type: `paystack.${event.event}`,
       created: Math.floor(Date.now() / 1000),
       data: event.data as any,
       is_raw: true,
     });
 
-    const standardEvents = this.mapToStandardEvents(event);
+    const standardEvents = this.mapToStandardEvents(event, contentHash);
 
     if (standardEvents) results.push(...standardEvents);
 
@@ -783,9 +786,10 @@ export class PaystackProvider
 
   private mapToStandardEvents = (
     event: PaystackWebhookEvent,
+    contentHash: string,
   ): Array<WebhookEventPayload> | null => {
     const created = Math.floor(Date.now() / 1000);
-    const id = `paykit:${event.event}:${crypto.randomUUID()}`;
+    const id = `paykit:${event.event}:${contentHash}`;
 
     switch (event.event) {
       case 'charge.success': {

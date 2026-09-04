@@ -33,6 +33,7 @@ import {
   createPaymentSchema,
   createRefundSchema,
   createSubscriptionSchema,
+  hashWebhookPayload,
   isEmailCustomer,
   parseCustomerName,
   paykitEvent$InboundSchema,
@@ -701,15 +702,20 @@ export class RazorpayProvider
 
     const results: Array<WebhookEventPayload<RazorpayRawEvents>> = [];
 
+    const contentHash = hashWebhookPayload(event.event, body);
+
     results.push({
-      id: `razorpay:${event.event}:${crypto.randomUUID()}`,
+      id: `razorpay:${event.event}:${contentHash}`,
       type: `razorpay.${event.event}`,
       created: event.created_at,
       data: event as any,
       is_raw: true,
     });
 
-    const standardEvents = await this.mapToStandardEvents(event);
+    const standardEvents = await this.mapToStandardEvents(
+      event,
+      contentHash,
+    );
 
     if (standardEvents) results.push(...standardEvents);
 
@@ -735,9 +741,10 @@ export class RazorpayProvider
 
   private mapToStandardEvents = async (
     event: RazorpayWebhookEvent,
+    contentHash: string,
   ): Promise<Array<WebhookEventPayload> | null> => {
     const created = event.created_at;
-    const id = `paykit:${event.event}:${crypto.randomUUID()}`;
+    const id = `paykit:${event.event}:${contentHash}`;
 
     switch (event.event) {
       case 'payment.authorized': {

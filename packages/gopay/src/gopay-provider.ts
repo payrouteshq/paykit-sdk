@@ -35,6 +35,7 @@ import {
   createPaymentSchema,
   createRefundSchema,
   createSubscriptionSchema,
+  hashWebhookPayload,
   isEmailCustomer,
   isIdCustomer,
   paykitEvent$InboundSchema,
@@ -1121,6 +1122,8 @@ export class GoPayProvider
       );
     }
 
+    const contentPayload = JSON.stringify(payment.value);
+
     const statusMap: Record<
       string,
       Payment['status'] | '__INDETERMINATE'
@@ -1155,7 +1158,10 @@ export class GoPayProvider
             paykitEvent$InboundSchema<Refund>({
               type: 'refund.created',
               created: new Date().getTime(),
-              id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+              id: hashWebhookPayload(
+                'refund.created',
+                contentPayload,
+              ),
               data: refund,
             }),
           ];
@@ -1171,7 +1177,7 @@ export class GoPayProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.created',
             created: new Date().getTime(),
-            id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+            id: hashWebhookPayload('payment.created', contentPayload),
             data: payment,
           }),
         ];
@@ -1183,7 +1189,7 @@ export class GoPayProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.updated',
             created: new Date().getTime(),
-            id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+            id: hashWebhookPayload('payment.updated', contentPayload),
             data: payment,
           }),
         ];
@@ -1195,7 +1201,7 @@ export class GoPayProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.updated',
             created: new Date().getTime(),
-            id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+            id: hashWebhookPayload('payment.updated', contentPayload),
             data: payment,
           }),
         ];
@@ -1215,7 +1221,10 @@ export class GoPayProvider
         const subscriptionCanceledWebhookEvent = {
           type: 'subscription.canceled' as const,
           created: new Date().getTime(),
-          id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+          id: hashWebhookPayload(
+            'subscription.canceled',
+            contentPayload,
+          ),
           data: subscription,
         };
 
@@ -1230,7 +1239,7 @@ export class GoPayProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.failed',
             created: new Date().getTime(),
-            id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+            id: hashWebhookPayload('payment.failed', contentPayload),
             data: payment,
           }),
         ];
@@ -1242,7 +1251,7 @@ export class GoPayProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.failed',
             created: new Date().getTime(),
-            id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+            id: hashWebhookPayload('payment.failed', contentPayload),
             data: payment,
           }),
         ];
@@ -1257,7 +1266,10 @@ export class GoPayProvider
         const subscriptionCreatedWebhookEvent = {
           type: 'subscription.created' as const,
           created: new Date().getTime(),
-          id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+          id: hashWebhookPayload(
+            'subscription.created',
+            contentPayload,
+          ),
           data: subscription,
         };
 
@@ -1272,13 +1284,19 @@ export class GoPayProvider
           paykitEvent$InboundSchema<Invoice>({
             type: 'invoice.generated',
             created: new Date().getTime(),
-            id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+            id: hashWebhookPayload(
+              'invoice.generated',
+              contentPayload,
+            ),
             data: invoice,
           }),
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.succeeded',
             created: new Date().getTime(),
-            id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+            id: hashWebhookPayload(
+              'payment.succeeded',
+              contentPayload,
+            ),
             data: payment,
           }),
         ];
@@ -1290,7 +1308,7 @@ export class GoPayProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.updated',
             created: new Date().getTime(),
-            id: crypto.randomBytes(8).toString('hex').slice(0, 15),
+            id: hashWebhookPayload('payment.updated', contentPayload),
             data: payment,
           }),
         ];

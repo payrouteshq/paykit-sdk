@@ -36,6 +36,7 @@ import {
   createCustomerSchema,
   createPaymentSchema,
   createRefundSchema,
+  hashWebhookPayload,
   schema,
   stringifyMetadataValues,
   validateRequiredKeys,
@@ -792,15 +793,20 @@ export class BachsProvider
     const results: Array<WebhookEventPayload<PayKitBachsRawEvents>> =
       [];
 
+    const contentHash = hashWebhookPayload(event.type, body);
+
     results.push({
-      id: `bachs:${event.type}:${crypto.randomUUID()}`,
+      id: `bachs:${event.type}:${contentHash}`,
       type: `bachs.${event.type}`,
       created: Math.floor(Date.now() / 1000),
       data: event.data as any,
       is_raw: true,
     });
 
-    const standardEvents = await this.mapToStandardEvents(event);
+    const standardEvents = await this.mapToStandardEvents(
+      event,
+      contentHash,
+    );
 
     if (standardEvents) results.push(...standardEvents);
 
@@ -809,9 +815,10 @@ export class BachsProvider
 
   private mapToStandardEvents = async (
     event: BachsWebhookEnvelope<unknown>,
+    contentHash: string,
   ): Promise<Array<WebhookEventPayload> | null> => {
     const created = Math.floor(Date.now() / 1000);
-    const id = `paykit:${event.type}:${crypto.randomUUID()}`;
+    const id = `paykit:${event.type}:${contentHash}`;
 
     switch (event.type) {
       case 'collection.succeeded':

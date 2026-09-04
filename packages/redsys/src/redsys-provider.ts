@@ -12,6 +12,7 @@ import {
   CreateSubscriptionSchema,
   Customer,
   HTTPClient,
+  hashWebhookPayload,
   isEmailCustomer,
   isIdCustomer,
   NotImplementedError,
@@ -751,10 +752,14 @@ export class RedsysProvider
         : null;
 
       const paymentId = `${dsOrder}_${params.Ds_AuthorisationCode ?? 'unknown'}`;
+      const contentHash = hashWebhookPayload(
+        'redsys.payment.succeeded',
+        body,
+      );
 
       events.push(
         {
-          id: randomBytes(8).toString('hex'),
+          id: contentHash,
           type: 'redsys.payment.succeeded',
           created: Math.floor(Date.now() / 1000),
           data: {
@@ -769,7 +774,7 @@ export class RedsysProvider
         paykitEvent$InboundSchema<Payment>({
           type: 'payment.succeeded',
           created: new Date().getTime(),
-          id: randomBytes(8).toString('hex').slice(0, 15),
+          id: `paykit:${contentHash}`,
           data: {
             id: paymentId,
             amount: amountNum,
@@ -784,9 +789,14 @@ export class RedsysProvider
         }),
       );
     } else {
+      const contentHash = hashWebhookPayload(
+        'redsys.payment.failed',
+        body,
+      );
+
       events.push(
         {
-          id: randomBytes(8).toString('hex'),
+          id: contentHash,
           type: 'redsys.payment.failed',
           created: Math.floor(Date.now() / 1000),
           data: {
@@ -800,7 +810,7 @@ export class RedsysProvider
         paykitEvent$InboundSchema<Payment>({
           type: 'payment.failed',
           created: new Date().getTime(),
-          id: randomBytes(8).toString('hex').slice(0, 15),
+          id: `paykit:${contentHash}`,
           data: {
             id: dsOrder,
             amount: amountNum,

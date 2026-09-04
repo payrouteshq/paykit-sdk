@@ -32,6 +32,7 @@ import {
   validateRequiredKeys,
   OperationFailedError,
   InvalidTypeError,
+  hashWebhookPayload,
   isEmailCustomer,
   ProviderMetadataRegistry,
   WebhookHandlerConfig,
@@ -676,8 +677,10 @@ export class MonnifyProvider
     const created = Math.floor(Date.now() / 1000);
     const results: Array<WebhookEventPayload<MonnifyRawEvents>> = [];
 
+    const contentHash = hashWebhookPayload(eventType, body);
+
     results.push({
-      id: `monnify:${eventType}:${crypto.randomUUID()}`,
+      id: `monnify:${eventType}:${contentHash}`,
       type: `monnify.${eventType}`,
       created,
       data: eventData as any,
@@ -693,7 +696,7 @@ export class MonnifyProvider
 
     if (standardType) {
       results.push({
-        id: `paykit:${eventType}:${crypto.randomUUID()}`,
+        id: `paykit:${eventType}:${contentHash}`,
         type: standardType,
         created,
         data: eventData as any, // todo: add mapper for event data

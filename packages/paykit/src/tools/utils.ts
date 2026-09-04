@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { setTimeout } from 'timers/promises';
 import { z } from 'zod';
 import { UnTraceableError } from '../error';
@@ -263,3 +264,21 @@ export const refundReasonMatcher = (matcher: string) => {
 
   return 'other';
 };
+
+/**
+ * Derives a stable webhook event id from the exact payload a provider signs.
+ *
+ * Providers verify their webhook signature against the raw request body, so a
+ * genuine retry of the same delivery is guaranteed to carry byte-identical
+ * content (or the signature wouldn't match). Hashing that content instead of
+ * generating a random id means retries collapse to the same id without PayKit
+ * having to store any delivery state.
+ */
+export const hashWebhookPayload = (
+  eventType: string,
+  rawPayload: string,
+): string =>
+  createHash('sha256')
+    .update(`${eventType}:${rawPayload}`)
+    .digest('hex')
+    .slice(0, 32);

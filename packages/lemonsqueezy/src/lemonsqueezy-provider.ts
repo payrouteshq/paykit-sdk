@@ -24,6 +24,7 @@ import {
   UpdateSubscriptionSchema,
   WebhookEventPayload,
   WebhookHandlerConfig,
+  hashWebhookPayload,
   parseCustomerName,
   paykitEvent$InboundSchema,
 } from '@paykit-sdk/core';
@@ -464,15 +465,23 @@ export class LemonSqueezyProvider
 
     const results: Array<WebhookEventPayload> = [];
 
+    const contentHash = hashWebhookPayload(
+      event.meta.event_name,
+      payload.body,
+    );
+
     results.push({
-      id: `lemonsqueezy:${event.meta.event_name}:${crypto.randomUUID()}`,
+      id: `lemonsqueezy:${event.meta.event_name}:${contentHash}`,
       type: `lemonsqueezy.${event.meta.event_name}`,
       created: Math.floor(Date.now() / 1000),
       data: event.data,
       is_raw: true,
     } as WebhookEventPayload);
 
-    const standardEvents = this.mapToStandardEvents(event);
+    const standardEvents = this.mapToStandardEvents(
+      event,
+      contentHash,
+    );
     if (standardEvents) results.push(...standardEvents);
 
     return results;
@@ -480,9 +489,10 @@ export class LemonSqueezyProvider
 
   private mapToStandardEvents(
     event: LemonSqueezyWebhookEvent,
+    contentHash: string,
   ): Array<WebhookEventPayload> | null {
     const created = Math.floor(Date.now() / 1000);
-    const id = `paykit:${event.meta.event_name}:${crypto.randomUUID()}`;
+    const id = `paykit:${event.meta.event_name}:${contentHash}`;
 
     switch (event.meta.event_name) {
       case 'order_created': {

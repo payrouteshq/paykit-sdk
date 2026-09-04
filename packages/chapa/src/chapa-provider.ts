@@ -31,6 +31,7 @@ import {
   createCheckoutSchema,
   createPaymentSchema,
   createRefundSchema,
+  hashWebhookPayload,
   isEmailCustomer,
   paykitEvent$InboundSchema,
   schema,
@@ -611,15 +612,20 @@ export class ChapaProvider
 
     const results: Array<WebhookEventPayload<ChapaRawEvents>> = [];
 
+    const contentHash = hashWebhookPayload(event.event, body);
+
     results.push({
-      id: `chapa:${event.event}:${crypto.randomUUID()}`,
+      id: `chapa:${event.event}:${contentHash}`,
       type: `chapa.${event.event}`,
       created: Math.floor(Date.now() / 1000),
       data: event as any,
       is_raw: true,
     });
 
-    const standardEvents = this.mapToStandardEvents(event);
+    const standardEvents = this.mapToStandardEvents(
+      event,
+      contentHash,
+    );
 
     if (standardEvents) results.push(...standardEvents);
 
@@ -645,9 +651,10 @@ export class ChapaProvider
 
   private mapToStandardEvents = (
     event: ChapaWebhookEvent,
+    contentHash: string,
   ): Array<WebhookEventPayload> | null => {
     const created = Math.floor(Date.now() / 1000);
-    const id = `paykit:${event.event}:${crypto.randomUUID()}`;
+    const id = `paykit:${event.event}:${contentHash}`;
 
     if (!isChapaTransactionEvent(event)) {
       if (this.opts.debug) {

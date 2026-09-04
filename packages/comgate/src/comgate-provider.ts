@@ -33,6 +33,7 @@ import {
   isEmailCustomer,
   ProviderMetadataRegistry,
   WebhookHandlerConfig,
+  hashWebhookPayload,
 } from '@paykit-sdk/core';
 import {
   CreateCheckoutSchema,
@@ -707,6 +708,8 @@ export class ComgateProvider
 
     const status = statusMap[comgateWebhookApiResponse.status];
 
+    const contentHash = hashWebhookPayload(webhookStatusOut, rawBody);
+
     const webhookHandlers: Partial<
       Record<
         Payment['status'],
@@ -722,7 +725,7 @@ export class ComgateProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.created',
             created: new Date().getTime(),
-            id: `paykit:payment:${Math.random().toString(36).substring(2, 15)}`,
+            id: `paykit:payment:${contentHash}`,
             data: payment,
           }),
         ];
@@ -737,7 +740,7 @@ export class ComgateProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.updated',
             created: new Date().getTime(),
-            id: `paykit:payment:${Math.random().toString(36).substring(2, 15)}`,
+            id: `paykit:payment:${contentHash}`,
             data: payment,
           }),
         ];
@@ -750,7 +753,7 @@ export class ComgateProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.failed',
             created: new Date().getTime(),
-            id: `paykit:payment:${Math.random().toString(36).substring(2, 15)}`,
+            id: `paykit:payment:${contentHash}`,
             data: payment,
           }),
         ];
@@ -764,13 +767,13 @@ export class ComgateProvider
           paykitEvent$InboundSchema<Payment>({
             type: 'payment.succeeded',
             created: new Date().getTime(),
-            id: `paykit:payment:${Math.random().toString(36).substring(2, 15)}`,
+            id: `paykit:payment:${contentHash}`,
             data: payment,
           }),
           paykitEvent$InboundSchema<Invoice>({
             type: 'invoice.generated',
             created: new Date().getTime(),
-            id: `paykit:invoice:${Math.random().toString(36).substring(2, 15)}`,
+            id: `paykit:invoice:${contentHash}`,
             data: invoice,
           }),
         ];

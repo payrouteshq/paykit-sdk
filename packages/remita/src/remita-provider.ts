@@ -31,6 +31,7 @@ import {
   WebhookEventPayload,
   WebhookHandlerConfig,
   createPaymentSchema,
+  hashWebhookPayload,
   isEmailCustomer,
   schema,
   stringifyMetadataValues,
@@ -606,8 +607,16 @@ export class RemitaProvider
     for (const notification of notifications) {
       if (!notification?.rrr) continue;
 
+      // A single delivery can batch several notifications, so the hash is
+      // derived per-notification (not from the whole raw body) to keep ids
+      // from colliding across items in the same batch.
+      const contentHash = hashWebhookPayload(
+        'notification',
+        JSON.stringify(notification),
+      );
+
       results.push({
-        id: `remita:notification:${crypto.randomUUID()}`,
+        id: `remita:notification:${contentHash}`,
         type: 'remita.notification',
         created: Math.floor(Date.now() / 1000),
         data: notification,
@@ -619,7 +628,7 @@ export class RemitaProvider
       if (!payment) continue;
 
       const created = Math.floor(Date.now() / 1000);
-      const id = `paykit:notification:${crypto.randomUUID()}`;
+      const id = `paykit:notification:${contentHash}`;
 
       if (payment.status === 'succeeded') {
         results.push({
