@@ -1,5 +1,11 @@
 # @paykit-sdk/bachs
 
+## 2.0.5
+
+### Patch Changes
+
+- 4f725c7: fix(bachs) create payment intent
+
 ## 2.0.4
 
 ### Patch Changes
