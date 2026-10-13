@@ -721,7 +721,11 @@ export class BachsProvider
 
     const refund = await this.unwrap(response, 'createRefund');
 
-    return Refund$inboundSchema(refund, session.charge.currency);
+    return Refund$inboundSchema(
+      refund,
+      session.charge.currency,
+      refund.status,
+    );
   };
 
   /**
@@ -878,7 +882,15 @@ export class BachsProvider
             ? chargeResponse.value.currency
             : 'USD';
 
-        const refund = Refund$inboundSchema(data, currency);
+        const refund = Refund$inboundSchema(
+          data,
+          currency,
+          event.type === 'refund.paid'
+            ? 'succeeded'
+            : event.type === 'refund.failed'
+              ? 'failed'
+              : 'pending',
+        );
 
         return [
           paykitEvent$InboundSchema({

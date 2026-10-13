@@ -272,16 +272,42 @@ export const Subscription$inboundSchema = (
   };
 };
 
+const refundStatus = (status: string | undefined): Refund['status'] => {
+  switch (status) {
+    case 'processing':
+      return 'pending';
+    case 'success':
+    case 'paid':
+      return 'succeeded';
+    case 'failed':
+      return 'failed';
+    default:
+      return undefined;
+  }
+};
+
 export const Refund$inboundSchema = (
   data: Pick<
     BachsRefundResponse,
     'refund_id' | 'requested_amount' | 'refunded_amount' | 'reason'
   >,
   currency: string,
-): Refund => ({
-  id: data.refund_id,
-  amount: Number(data.refunded_amount ?? data.requested_amount),
-  currency,
-  reason: data.reason ?? null,
-  metadata: null,
-});
+  status?: Refund['status'] | string,
+): Refund => {
+  const resolved =
+    status === 'pending' || status === 'succeeded' || status === 'failed'
+      ? status
+      : refundStatus(status);
+
+  return {
+    id: data.refund_id,
+    amount: Number(
+      (resolved === 'succeeded' ? data.refunded_amount : null) ??
+        data.requested_amount,
+    ),
+    currency,
+    reason: data.reason ?? null,
+    metadata: null,
+    ...(resolved && { status: resolved }),
+  };
+};

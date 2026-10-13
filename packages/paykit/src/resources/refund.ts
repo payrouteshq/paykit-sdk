@@ -8,6 +8,8 @@ const refundReasonSchema = schema<RefundReason>()(
   z.string().nullable(),
 );
 
+export type RefundStatus = 'pending' | 'succeeded' | 'failed';
+
 export interface Refund {
   /**
    * The ID of the refund.
@@ -33,6 +35,11 @@ export interface Refund {
    * The metadata of the refund.
    */
   metadata: PaykitMetadata | null;
+
+  /**
+   * The lifecycle status of the refund, when the provider reports one.
+   */
+  status?: RefundStatus;
 }
 
 export const refundSchema = schema<Refund>()(
@@ -42,6 +49,7 @@ export const refundSchema = schema<Refund>()(
     currency: z.string(),
     reason: refundReasonSchema,
     metadata: metadataSchema.nullable(),
+    status: z.enum(['pending', 'succeeded', 'failed']).optional(),
   }),
 );
 
