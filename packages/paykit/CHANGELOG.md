@@ -1,5 +1,11 @@
 # @paykit-sdk/core
 
+## 1.4.0
+
+### Minor Changes
+
+- 0deb530: fix(bachs) expose refund status so refund.created can be told apart from paid and failed refunds
+
 ## 1.3.4
 
 ### Patch Changes
