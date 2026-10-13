@@ -56,6 +56,7 @@ import {
   BachsCustomerEventData,
   BachsEventPayloadMap,
   BachsPaymentResponse,
+  BachsMerchantIntent,
   BachsProductItemRequest,
   BachsRefundEventData,
   BachsRefundResponse,
@@ -238,7 +239,8 @@ export class BachsProvider
    */
   private runCheckoutFlow = async (input: {
     customer: Payee;
-    productCart: BachsProductItemRequest[];
+    productCart?: BachsProductItemRequest[];
+    pricing?: BachsMerchantIntent;
     successUrl: string;
     cancelUrl?: string;
     metadata: Record<string, string> | null;
@@ -250,7 +252,8 @@ export class BachsProvider
   }> => {
     const body: BachsCreateCheckoutSessionRequest = {
       customer: this.toCustomerRequest(input.customer),
-      product_cart: input.productCart,
+      ...(input.productCart && { product_cart: input.productCart }),
+      ...(input.pricing && { pricing: input.pricing }),
       success_url: input.successUrl,
       ...(input.cancelUrl && { cancel_url: input.cancelUrl }),
       ...(input.metadata && { metadata: input.metadata }),
@@ -556,12 +559,12 @@ export class BachsProvider
       );
     }
 
-    if (!data.item_id) {
+    if (!data.item_id && !(data.amount > 0)) {
       throw new ConfigurationError(
-        'item_id is required for createPayment',
+        'item_id or a positive amount is required for createPayment',
         {
           provider: this.providerName,
-          missingKeys: ['item_id'],
+          missingKeys: ['item_id', 'amount'],
         },
       );
     }
@@ -588,7 +591,15 @@ export class BachsProvider
 
     const { create, session } = await this.runCheckoutFlow({
       customer: data.customer,
-      productCart: [{ product_id: data.item_id, quantity: 1 }],
+      ...(data.item_id
+        ? { productCart: [{ product_id: data.item_id, quantity: 1 }] }
+        : {
+            pricing: {
+              amount: data.amount.toString(),
+              currency: data.currency,
+              price_type: 'fixed',
+            },
+          }),
       successUrl: success_url,
       cancelUrl: pm?.cancel_url,
       metadata: data.metadata

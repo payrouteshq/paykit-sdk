@@ -299,11 +299,36 @@ describe('BachsProvider.createCheckout / createPayment', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('createPayment throws ConfigurationError without item_id', async () => {
+  it('createPayment sends raw pricing instead of product_cart without item_id', async () => {
+    fetchMock
+      .mockResolvedValueOnce(createResponse())
+      .mockResolvedValueOnce(sessionResponse());
+
+    await makeProvider().createPayment({
+      customer: { email: 'jane@example.com' },
+      amount: 50,
+      currency: 'USD',
+      item_id: null,
+      capture_method: 'automatic',
+      provider_metadata: {
+        success_url: 'https://shop.example.com/thanks',
+      },
+    } as never);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.product_cart).toBeUndefined();
+    expect(body.pricing).toEqual({
+      amount: '50',
+      currency: 'USD',
+      price_type: 'fixed',
+    });
+  });
+
+  it('createPayment throws ConfigurationError without item_id or amount', async () => {
     await expect(
       makeProvider().createPayment({
         customer: { email: 'jane@example.com' },
-        amount: 50,
+        amount: 0,
         currency: 'USD',
         item_id: null,
         capture_method: 'automatic',
