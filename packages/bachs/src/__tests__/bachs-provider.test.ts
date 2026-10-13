@@ -930,6 +930,49 @@ describe('BachsProvider.handleWebhook', () => {
     expect(events[0].is_raw).toBe(true);
   });
 
+  it.each([
+    ['refund.created', 'processing', 'pending'],
+    ['refund.paid', 'success', 'succeeded'],
+    ['refund.failed', 'failed', 'failed'],
+  ])('maps %s to refund status %s -> %s', async (type, apiStatus, expected) => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const body = JSON.stringify({
+      id: `evt_${type}`,
+      type,
+      created_at: '2026-04-27T12:00:00Z',
+      organization_id: 'org_abc123',
+      data: {
+        refund_id: 'ref_1a2b3c4d5e',
+        charge_id: 'chr_1a2b3c4d5e6f',
+        status: apiStatus,
+        requested_amount: '10.00',
+        refunded_amount: apiStatus === 'success' ? '10.00' : '0.00',
+        reason: null,
+      },
+    });
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        payment_id: 'chr_1a2b3c4d5e6f',
+        status: 'succeeded',
+        amount: '10.00',
+        currency: 'USD',
+        created_at: '2026-04-27T12:00:00Z',
+        updated_at: '2026-04-27T12:00:00Z',
+      }),
+    );
+
+    const events = await makeProvider().handleWebhook(
+      dto(body, timestamp, sign(timestamp, body)),
+      SECRET,
+    );
+
+    expect(events[1].data).toMatchObject({
+      status: expected,
+      amount: 10,
+    });
+  });
+
   it('maps refund.created by fetching the charge for currency', async () => {
     const timestamp = Math.floor(Date.now() / 1000);
     const body = JSON.stringify({
