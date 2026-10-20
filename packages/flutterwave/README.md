@@ -1,0 +1,214 @@
+# @paykit-sdk/flutterwave
+
+Flutterwave provider for PayKit, built on the
+[Flutterwave v4 API](https://developer.flutterwave.com/v4.0.0/docs/getting-started).
+
+## Quick Start
+
+```typescript
+import { createEndpointHandlers, PayKit } from '@paykit-sdk/core';
+import { createFlutterwave, flutterwave } from '@paykit-sdk/flutterwave';
+
+// Method 1: Using environment variables
+const provider = flutterwave(); // Ensure required environment variables are set
+
+// Method 2: Direct configuration
+const provider = createFlutterwave({
+  clientId: process.env.FLUTTERWAVE_CLIENT_ID,
+  clientSecret: process.env.FLUTTERWAVE_CLIENT_SECRET,
+  isSandbox: true,
+  debug: true,
+});
+
+export const paykit = new PayKit(provider);
+export const endpoints = createEndpointHandlers(paykit);
+```
+
+Required env vars for `flutterwave()`:
+
+```bash
+FLUTTERWAVE_CLIENT_ID=...
+FLUTTERWAVE_CLIENT_SECRET=...
+FLUTTERWAVE_SANDBOX=true # anything but "false" uses the sandbox
+```
+
+v4 authenticates with an OAuth 2.0 client id and secret rather than a
+single secret key. PayKit fetches and refreshes the access token for you.
+
+## What maps to what
+
+| PayKit          | Flutterwave                                |
+| --------------- | ------------------------------------------ |
+| `payments`      | charges (`automatic`) or orders (`manual`) |
+| `customers`     | customers (no delete endpoint)             |
+| `refunds`       | refunds                                    |
+| `checkouts`     | not supported, v4 has no hosted checkout   |
+| `subscriptions` | not supported, v4 has no subscription API  |
+
+Amounts are in major units (`12.34`), the same as Flutterwave.
+
+## Creating a payment
+
+Flutterwave charges a payment method. Pass one inline and PayKit uses
+the orchestrator to create the customer and method in one call:
+
+```typescript
+const payment = await paykit.payments.create({
+  customer: { email: 'jane@example.com' }, // or { id: 'cus_...' }
+  amount: 5000,
+  currency: 'NGN',
+  item_id: 'sku_123',
+  capture_method: 'automatic',
+  metadata: { order_id: 'ORD-9876' },
+  provider_metadata: {
+    payment_method: {
+      type: 'mobile_money',
+      mobile_money: {
+        network: 'MTN',
+        country_code: '233',
+        phone_number: '9012345678',
+      },
+    },
+    redirect_url: 'https://shop.example.com/return',
+  },
+});
+
+if (payment.payment_url) {
+  // Send the customer here to finish 3DS or a mobile money redirect
+}
+```
+
+Card details must be encrypted before they reach PayKit, following
+[Flutterwave's encryption guide](https://developer.flutterwave.com/v4.0.0/docs/encryption).
+
+To charge a saved payment method instead, use an existing customer and
+`payment_method_id`:
+
+```typescript
+await paykit.payments.create({
+  customer: { id: 'cus_...' },
+  amount: 5000,
+  currency: 'NGN',
+  item_id: null,
+  capture_method: 'automatic',
+  provider_metadata: { payment_method_id: 'pmd_...' },
+});
+```
+
+Provide exactly one of `payment_method` or `payment_method_id`.
+
+### Payment status
+
+A pending payment reports `requires_action` when Flutterwave is waiting
+on a PIN, OTP, address, redirect, or offline instruction, and
+`processing` while Flutterwave is still working on it.
+
+Complete a card charge that needs a PIN or OTP with `payments.update`:
+
+```typescript
+await paykit.payments.update(payment.id, {
+  provider_metadata: {
+    authorization: { type: 'otp', otp: { code: '123456' } },
+  },
+});
+```
+
+### Manual capture
+
+`capture_method: 'manual'` creates an order, authorized first and
+captured later. Order ids start with `ord_`:
+
+```typescript
+const payment = await paykit.payments.create({
+  // ...
+  capture_method: 'manual',
+}); // status: 'requires_capture'
+
+await paykit.payments.capture(payment.id, { amount: payment.amount });
+await paykit.payments.cancel(payment.id); // or void it instead
+```
+
+Flutterwave captures the full authorized amount, so a smaller `amount`
+is rejected rather than over-captured.
+
+## Refunds
+
+```typescript
+await paykit.refunds.create({
+  payment_id: 'chg_...',
+  amount: 2000, // 0 refunds the full payment
+  reason: 'duplicate',
+  metadata: null,
+});
+```
+
+Flutterwave accepts `duplicate`, `fraudulent`, `requested_by_customer`
+and `expired_uncaptured_charge`. Any other text is sent as
+`requested_by_customer` and kept in the refund's `meta`, and comes back
+as `reason`.
+
+## Customers
+
+```typescript
+const customer = await paykit.customers.create({
+  email: 'jane@example.com',
+  name: 'Jane Doe',
+  phone: '+2349067985861', // E.164
+  billing: null,
+});
+
+await paykit.customers.update(customer.id, { name: 'Jane D.' });
+```
+
+A customer's email can't be changed after creation.
+
+## Safe retries and testing
+
+Every write sends an `X-Idempotency-Key`. Pass your own through
+`provider_metadata.idempotencyKey` so a retried call returns the
+original resource. In the sandbox, `provider_metadata.scenarioKey`
+sets `X-Scenario-Key` to
+[simulate an outcome](https://developer.flutterwave.com/v4.0.0/docs/testing).
+`provider_metadata.traceId` sets `X-Trace-Id`.
+
+## Webhooks
+
+Set a secret hash in the Flutterwave dashboard and pass it as the
+webhook secret. PayKit verifies `flutterwave-signature` (a base64
+HMAC-SHA256 of the raw body):
+
+```typescript
+const webhook = paykit.webhooks
+  .setup({ webhookSecret: process.env.FLUTTERWAVE_SECRET_HASH! })
+  .on('payment.succeeded', async event => {})
+  .on('payment.failed', async event => {})
+  .on('payment.updated', async event => {})
+  .on('refund.created', async event => {});
+
+await webhook.handle({
+  body: await request.text(),
+  headersAsObject: Object.fromEntries(request.headers),
+  fullUrl: request.url,
+});
+```
+
+PayKit re-reads the payment from Flutterwave before emitting a payment
+or refund event and trusts that over the webhook body. If the re-read
+fails, the handler throws so Flutterwave retries the delivery.
+
+| Raw event                         | PayKit event                                               |
+| --------------------------------- | ---------------------------------------------------------- |
+| `flutterwave.charge.completed`    | `payment.succeeded`, `payment.failed` or `payment.updated` |
+| `flutterwave.order.authorization` | `payment.succeeded`, `payment.failed` or `payment.updated` |
+| `flutterwave.refund.completed`    | `refund.created`                                           |
+| `flutterwave.transfer.disburse`   | raw only                                                   |
+| `flutterwave.transfer.reversal`   | raw only                                                   |
+
+## Types
+
+Types for the whole Flutterwave API are generated from
+`openapi.json` with `openapi-typescript`:
+
+```bash
+pnpm --filter @paykit-sdk/flutterwave generate:types
+```
