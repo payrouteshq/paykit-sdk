@@ -25,10 +25,6 @@ import {
 type FlutterwaveName = NonNullable<FlutterwaveCustomer['name']>;
 type FlutterwavePhone = NonNullable<FlutterwaveCustomer['phone']>;
 
-/**
- * `next_action` types where the customer, or the merchant on their
- * behalf, still has to do something before the payment can settle.
- */
 const ACTIONABLE_NEXT_ACTIONS = new Set<
   FlutterwaveNextAction['type']
 >([
@@ -121,8 +117,6 @@ const toPayee = (customer: {
   return null;
 };
 
-/* Names and phone numbers */
-
 export const toFlutterwaveName = (name: string): FlutterwaveName => {
   const [first, ...rest] = name.trim().split(/\s+/);
   const last = rest.pop();
@@ -140,11 +134,6 @@ const fromFlutterwaveName = (
   [name?.first, name?.middle, name?.last].filter(Boolean).join(' ') ||
   undefined;
 
-/**
- * ITU-T E.164 country codes are prefix-free, so the leading digits
- * alone say how long the code is: 1 and 7 are single digit, the codes
- * below are two digits, everything else is three.
- */
 const TWO_DIGIT_CALLING_CODES = new Set([
   '20',
   '27',
@@ -197,10 +186,6 @@ const callingCodeLength = (digits: string): number => {
   return TWO_DIGIT_CALLING_CODES.has(digits.slice(0, 2)) ? 2 : 3;
 };
 
-/**
- * Splits an E.164 number (`+2349067985861`) into Flutterwave's
- * `{ country_code, number }`. Returns `null` when the input isn't E.164.
- */
 export const toFlutterwavePhone = (
   phone: string,
 ): FlutterwavePhone | null => {
@@ -223,8 +208,6 @@ const fromFlutterwavePhone = (
   phone
     ? `+${phone.country_code.replace(/^\+/, '')}${phone.number}`
     : null;
-
-/* Payments */
 
 type FlutterwavePaymentSource = Pick<
   FlutterwaveCharge,
@@ -289,8 +272,6 @@ export const Payment$fromOrder = (data: FlutterwaveOrder): Payment =>
     ),
   );
 
-/* Customers */
-
 export const Customer$inboundSchema = (
   data: FlutterwaveCustomer,
 ): Customer => ({
@@ -307,8 +288,6 @@ export const Customer$inboundSchema = (
   updated_at: null,
 });
 
-/* Refunds */
-
 const REFUND_REASONS: ReadonlySet<string> =
   new Set<FlutterwaveRefundReason>([
     'duplicate',
@@ -317,15 +296,8 @@ const REFUND_REASONS: ReadonlySet<string> =
     'expired_uncaptured_charge',
   ]);
 
-/** `meta` key that carries a free-text refund reason Flutterwave can't store. */
 export const REFUND_REASON_NOTE_KEY = 'reason_note';
 
-/**
- * Flutterwave only accepts a fixed set of refund reasons, but PayKit's
- * `reason` is free text. A value outside the set falls back to
- * `requested_by_customer` and the original text is returned as `note`
- * so the caller can keep it in the refund's `meta`.
- */
 export const toRefundReason = (
   reason: string | null,
 ): { reason: FlutterwaveRefundReason; note?: string } => {

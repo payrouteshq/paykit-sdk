@@ -302,7 +302,6 @@ export class FlutterwaveProvider
     });
   }
 
-  /** Flutterwave needs `{ country_code, number }`; PayKit carries E.164. */
   private parsePhone(phone: string, method: string) {
     const parsed = toFlutterwavePhone(phone);
 
