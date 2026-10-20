@@ -47,6 +47,8 @@ export type FlutterwaveRefund = WithRequired<
   'id' | 'status'
 >;
 
+export type FlutterwaveCurrency = Schemas['currency'];
+
 /* Status unions */
 
 export type FlutterwaveChargeStatus = Schemas['charge_status'];
@@ -65,14 +67,20 @@ export type FlutterwaveCreateCustomerRequest = Schemas['customer_in'];
 export type FlutterwaveUpdateCustomerRequest =
   Schemas['customer_update_in'];
 export type FlutterwaveCreateChargeRequest = Schemas['charge_in'];
-export type FlutterwaveUpdateChargeRequest = Schemas['charge_update_in'];
+export type FlutterwaveUpdateChargeRequest =
+  Schemas['charge_update_in'];
 export type FlutterwaveCreateOrderRequest = Schemas['order_in'];
-export type FlutterwaveUpdateOrderRequest = Schemas['order_update_in'];
-export type FlutterwaveDirectChargeRequest = Schemas['direct_charge_in'];
-export type FlutterwaveDirectOrderRequest = Schemas['direct_order_in'];
+export type FlutterwaveUpdateOrderRequest =
+  Schemas['order_update_in'];
+export type FlutterwaveDirectChargeRequest =
+  Schemas['direct_charge_in'];
+export type FlutterwaveDirectOrderRequest =
+  Schemas['direct_order_in'];
 export type FlutterwaveCreateRefundRequest = Schemas['refund_in'];
-export type FlutterwavePaymentMethodRequest = Schemas['payment_method_in'];
-export type FlutterwaveChargeAuthorization = Schemas['authorization_in'];
+export type FlutterwavePaymentMethodRequest =
+  Schemas['payment_method_in'];
+export type FlutterwaveChargeAuthorization =
+  Schemas['authorization_in'];
 export type FlutterwaveCustomerInput = Schemas['customer_in'];
 
 /* Webhooks */
