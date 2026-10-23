@@ -1,15 +1,20 @@
 {
   "name": "@paykit-sdk/flutterwave",
   "version": "1.0.0",
-  "description": "Flutterwave provider for PayKit",
+  "description": "Flutterwave provider for PayKit, supporting the v3 and v4 APIs",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     }
   },
   "files": [
@@ -22,13 +27,21 @@
     "build": "tsup",
     "test": "vitest run --config ../../vitest.config.ts packages/flutterwave/src",
     "typecheck": "tsc --noEmit",
-    "generate:types": "openapi-typescript src/v4/openapi.json -o src/v4/generated/schema.ts"
+    "generate:types": "openapi-typescript src/v4/openapi.json -o src/v4/generated/schema.ts",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
-  "keywords": [],
+  "keywords": [
+    "flutterwave",
+    "paykit",
+    "payment",
+    "payments",
+    "africa",
+    "typescript"
+  ],
   "license": "ISC",
   "author": "Emmanuel Odii",
   "peerDependencies": {
-    "@paykit-sdk/core": "^1.2.3"
+    "@paykit-sdk/core": "^1.4.0"
   },
   "devDependencies": {
     "@paykit-sdk/core": "workspace:*",
@@ -41,8 +54,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/usepaykit/paykit-sdk.git"
+    "url": "git+https://github.com/usepaykit/paykit-sdk.git",
+    "directory": "packages/flutterwave"
   },
+  "homepage": "https://github.com/usepaykit/paykit-sdk/tree/main/packages/flutterwave#readme",
   "bugs": {
     "url": "https://github.com/usepaykit/paykit-sdk/issues"
   }
