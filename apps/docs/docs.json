@@ -28,6 +28,7 @@
           "providers/bachs",
           "providers/chapa",
           "providers/comgate",
+          "providers/flutterwave",
           "providers/gopay",
           "providers/lemonsqueezy",
           "providers/mercadopago",

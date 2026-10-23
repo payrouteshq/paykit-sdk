@@ -1,0 +1,49 @@
+{
+  "name": "@paykit-sdk/flutterwave",
+  "version": "0.0.0",
+  "description": "Flutterwave provider for PayKit",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "paykit": {
+    "type": "provider"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --config ../../vitest.config.ts packages/flutterwave/src",
+    "typecheck": "tsc --noEmit",
+    "generate:types": "openapi-typescript src/v4/openapi.json -o src/v4/generated/schema.ts"
+  },
+  "keywords": [],
+  "license": "ISC",
+  "author": "Emmanuel Odii",
+  "peerDependencies": {
+    "@paykit-sdk/core": "^1.2.3"
+  },
+  "devDependencies": {
+    "@paykit-sdk/core": "workspace:*",
+    "openapi-typescript": "^7.13.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/usepaykit/paykit-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/usepaykit/paykit-sdk/issues"
+  }
+}

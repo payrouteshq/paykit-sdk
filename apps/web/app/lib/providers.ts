@@ -26,6 +26,17 @@ export const PROVIDERS: Provider[] = [
     logo: null,
   },
   {
+    id: 'flutterwave',
+    name: 'Flutterwave',
+    tagline: 'Payments and payouts across Africa and beyond',
+    region: 'Africa',
+    packageName: '@paykit-sdk/flutterwave',
+    initFn: 'flutterwave',
+    website: 'https://flutterwave.com',
+    docsUrl: 'https://docs.usepaykit.dev/providers/flutterwave',
+    logo: null,
+  },
+  {
     id: 'stripe',
     name: 'Stripe',
     tagline: 'Global payment processing',
