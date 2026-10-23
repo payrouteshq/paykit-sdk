@@ -207,7 +207,7 @@ fails, the handler throws so Flutterwave retries the delivery.
 ## Types
 
 Types for the whole Flutterwave API are generated from
-`openapi.json` with `openapi-typescript`:
+`src/v4/openapi.json` with `openapi-typescript`:
 
 ```bash
 pnpm --filter @paykit-sdk/flutterwave generate:types

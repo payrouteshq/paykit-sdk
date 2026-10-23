@@ -2,7 +2,7 @@ import { validateRequiredKeys } from '@paykit-sdk/core';
 import {
   FlutterwaveOptions,
   FlutterwaveProvider,
-} from './flutterwave-provider';
+} from './v4/flutterwave-provider';
 
 export const createFlutterwave = (config: FlutterwaveOptions) => {
   return new FlutterwaveProvider(config);
@@ -24,4 +24,4 @@ export const flutterwave = () => {
 
 export { FlutterwaveProvider, type FlutterwaveOptions };
 
-export * from './schema';
+export * from './v4/schema';

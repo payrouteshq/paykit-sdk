@@ -22,7 +22,7 @@
     "build": "tsup",
     "test": "vitest run --config ../../vitest.config.ts packages/flutterwave/src",
     "typecheck": "tsc --noEmit",
-    "generate:types": "openapi-typescript openapi.json -o src/generated/schema.ts"
+    "generate:types": "openapi-typescript src/v4/openapi.json -o src/v4/generated/schema.ts"
   },
   "keywords": [],
   "license": "ISC",

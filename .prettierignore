@@ -63,4 +63,4 @@ Thumbs.db
 .git/ 
 packages/registry/shared/schema/typeorm.ts
 # Generated from provider OpenAPI specs
-packages/*/src/generated/
+packages/*/src/**/generated/
