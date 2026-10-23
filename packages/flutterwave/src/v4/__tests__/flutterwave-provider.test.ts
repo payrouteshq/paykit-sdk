@@ -129,10 +129,12 @@ const useFetch = (
     fetchMock.mock.calls.filter(([url]) => url !== TOKEN_URL);
 
   const lastCall = (method: string, path: string) => {
-    const call = apiCalls().findLast(
-      ([url, init]) =>
-        url === `${BASE_URL}${path}` && init?.method === method,
-    );
+    const call = apiCalls()
+      .filter(
+        ([url, init]) =>
+          url === `${BASE_URL}${path}` && init?.method === method,
+      )
+      .at(-1);
 
     if (!call) throw new Error(`No ${method} ${path} call recorded`);
 
