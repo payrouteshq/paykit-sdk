@@ -1,7 +1,14 @@
 # @paykit-sdk/flutterwave
 
-Flutterwave provider for PayKit, built on the
-[Flutterwave v4 API](https://developer.flutterwave.com/v4.0.0/docs/getting-started).
+Flutterwave provider for PayKit. It supports both Flutterwave APIs, and
+you choose one in the config:
+
+- **[v4](https://developer.flutterwave.com/v4.0.0/docs/getting-started)**
+  (the default) authenticates with an OAuth client id and secret.
+- **[v3](#flutterwave-v3)** authenticates with a secret key, and adds hosted
+  checkout and subscriptions.
+
+The rest of this page, up to [Flutterwave v3](#flutterwave-v3), is about v4.
 
 ## Quick Start
 
@@ -206,9 +213,233 @@ fails, the handler throws so Flutterwave retries the delivery.
 
 ## Types
 
-Types for the whole Flutterwave API are generated from
+Types for the whole Flutterwave v4 API are generated from
 `src/v4/openapi.json` with `openapi-typescript`:
 
 ```bash
 pnpm --filter @paykit-sdk/flutterwave generate:types
 ```
+
+The v3 types are written by hand, since Flutterwave publishes no spec for it.
+Both sets are exported from the package.
+
+## Flutterwave v3
+
+Set `apiVersion: 'v3'` to use the older, secret-key API instead of v4.
+It is the only option for accounts without v4 access, and it adds
+hosted checkout and subscriptions, which v4 lacks.
+
+```typescript
+const provider = createFlutterwave({
+  apiVersion: 'v3',
+  secretKey: process.env.FLUTTERWAVE_SECRET_KEY, // FLWSECK_TEST-... or FLWSECK-...
+  encryptionKey: process.env.FLUTTERWAVE_ENCRYPTION_KEY, // only to charge cards
+  isSandbox: true,
+});
+```
+
+Or from the environment, where `FLUTTERWAVE_API_VERSION=v3` (or just
+having `FLUTTERWAVE_SECRET_KEY` set) picks v3:
+
+```bash
+FLUTTERWAVE_API_VERSION=v3
+FLUTTERWAVE_SECRET_KEY=...
+FLUTTERWAVE_ENCRYPTION_KEY=... # 24 characters, only to charge cards
+FLUTTERWAVE_SANDBOX=true
+```
+
+v3 uses one host for sandbox and live, and the key decides which you
+hit. `isSandbox` must agree with the key (`_TEST` in it), or the
+provider refuses to start.
+
+### What maps to what
+
+| PayKit          | Flutterwave v3                                  |
+| --------------- | ----------------------------------------------- |
+| `checkouts`     | hosted payment links (`/payments`)              |
+| `payments`      | direct charges, preauthorized when `manual`     |
+| `refunds`       | transaction refunds                             |
+| `subscriptions` | payment plans, subscribed to by paying for them |
+| `customers`     | not supported, v3 has no customer API           |
+
+A payment's `id` is its **`reference`** (`tx_ref`), the one you
+choose, or a random `pk_...`. Flutterwave only issues its numeric
+transaction id once a charge exists, so the reference is the one id that
+is the same from the first call to the last. Numeric ids are accepted
+too. A reference must not be all digits.
+
+### Hosted checkout
+
+```typescript
+const checkout = await paykit.checkouts.create({
+  customer: { email: 'ada@example.com' },
+  session_type: 'one_time',
+  item_id: 'sku_123',
+  quantity: 1,
+  metadata: null,
+  success_url: 'https://example.com/thanks',
+  cancel_url: 'https://example.com/cart',
+  provider_metadata: { amount: 2500, currency: 'NGN' },
+});
+
+redirect(checkout.payment_url);
+```
+
+`amount` and `currency` are required for a one-time checkout. For a
+recurring one, `item_id` is a payment plan id, the plan sets the amount,
+and `provider_metadata.redirect_url` replaces `success_url`.
+
+Flutterwave creates no transaction until the customer pays, so
+`checkouts.retrieve(id)` returns `null` before then.
+
+### Card payments
+
+v3 only accepts card details encrypted, which the provider does for you
+with `encryptionKey`. Most cards need more from the customer, so a payment
+comes back as `requires_action`, and `metadata.flutterwave_authorization_mode`
+says what Flutterwave wants next:
+
+| Mode         | What to do                                                                               |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `pin`        | Call `payments.create` again with the same `reference` and `card`, plus `authorization`. |
+| `avs_noauth` | The same, with an address. `metadata.flutterwave_authorization_fields` lists the fields. |
+| `otp`        | Call `payments.update(id, { provider_metadata: { otp } })`.                              |
+| `redirect`   | Send the customer to `payment_url`, then `payments.retrieve(id)` once they return.       |
+
+```typescript
+const card = {
+  number: '5531886652142950',
+  cvv: '564',
+  expiry_month: '09',
+  expiry_year: '32',
+};
+const base = {
+  customer: { email: 'ada@example.com' },
+  amount: 1500,
+  currency: 'NGN',
+  item_id: 'sku_123',
+  capture_method: 'automatic' as const,
+};
+
+// 1. Flutterwave asks for a PIN
+const first = await paykit.payments.create({
+  ...base,
+  provider_metadata: { reference: 'order-1', card },
+});
+// first.metadata.flutterwave_authorization_mode === 'pin'
+
+// 2. Send the PIN, and Flutterwave asks for an OTP
+await paykit.payments.create({
+  ...base,
+  provider_metadata: {
+    reference: 'order-1',
+    card,
+    authorization: { mode: 'pin', pin: '3310' },
+  },
+});
+
+// 3. Finish with the OTP
+const done = await paykit.payments.update('order-1', {
+  provider_metadata: { otp: '12345' },
+});
+// done.status === 'succeeded'
+```
+
+A declined card throws `OperationFailedError` with Flutterwave's reason
+in the message, for example `Insufficient Funds`.
+
+Other ways to charge:
+
+- **Saved card:** `provider_metadata: { token, reference }` makes a
+  tokenized charge. The token is `card.token` on a verified transaction,
+  and the customer's email must match the one it was saved with.
+- **Other methods:** `provider_metadata: { payment_type: 'mobile_money_ghana', fields: { network: 'MTN', phone_number: '...' } }`
+  is sent to `/charges?type=<payment_type>`. Most redirect, so you get a
+  `payment_url`.
+- **Subscribe:** `provider_metadata: { payment_plan: '12345' }` enrolls
+  the customer in a plan with the charge.
+
+### Manual capture
+
+`capture_method: 'manual'` preauthorizes a card: it holds the funds
+rather than taking them. Flutterwave must enable this on your account,
+and it needs the preauthorization test card in the sandbox
+(`5377283645077450`).
+
+```typescript
+const held = await paykit.payments.create({
+  ...base,
+  capture_method: 'manual',
+  provider_metadata,
+});
+// held.status === 'requires_capture'
+
+await paykit.payments.capture(held.id, { amount: 1000 }); // up to the amount held
+await paykit.payments.cancel(held.id); // or release the hold
+```
+
+The hold lapses after seven days.
+
+### Refunds
+
+```typescript
+await paykit.refunds.create({
+  payment_id: 'order-1',
+  amount: 500, // 0 refunds the whole payment
+  reason: 'Customer asked',
+  metadata: null,
+});
+```
+
+v3 can't attach metadata to a refund, so it is ignored. A refund usually
+takes 3 to 15 working days to reach the customer, even when its status
+already reads `succeeded`.
+
+### Subscriptions
+
+Flutterwave subscribes a customer when they pay for a payment plan, so
+`subscriptions.create` returns a `pending` subscription carrying the
+`payment_url` to send them to. `item_id` is the plan id, and
+`provider_metadata.redirect_url` is required. Its `id` is the checkout
+reference until it is paid. After that, `subscriptions.retrieve` and
+`subscriptions.cancel` accept either the reference or the numeric id.
+
+Flutterwave doesn't expose a subscription's billing period, so
+`current_period_start` and `current_period_end` are worked out from when it
+started and the plan's interval. Looking up a subscription by its numeric
+id pages through your subscriptions, since there is no endpoint to fetch
+one. Subscriptions can be cancelled but not updated or deleted.
+
+### Webhooks
+
+Set a **secret hash** in the dashboard under Settings, then Webhooks, and
+pass the same value as the webhook secret. Flutterwave sends it back in
+the `verif-hash` header, which PayKit compares in constant time.
+
+Flutterwave sends two shapes: `{ event, data }`, and a bare legacy object
+for charges and refunds (seen from the sandbox). Both are handled.
+
+| Flutterwave event                      | PayKit event                                               |
+| -------------------------------------- | ---------------------------------------------------------- |
+| `charge.completed`                     | `payment.succeeded`, `payment.failed` or `payment.updated` |
+| `refund.completed`                     | `refund.created`                                           |
+| `subscription.cancelled`               | `subscription.canceled`                                    |
+| anything else (`transfer.completed`..) | raw only, as `flutterwave.<event>`                         |
+
+Every event is also emitted raw. A charge or refund is re-read from
+Flutterwave before it is reported, because a webhook is only a
+notification. If that lookup fails the handler throws, so Flutterwave
+retries.
+
+### Good to know
+
+- Writes are never retried automatically. v3 has no idempotency keys, so
+  retrying a charge or refund after a timeout could do it twice.
+- v3 can't change a transaction's metadata, so `payments.update` only
+  completes a charge with an OTP.
+- On a preauthorized charge Flutterwave replaces its `meta` on some
+  responses. The provider hides the keys it adds, but check
+  `payments.retrieve` if you rely on metadata after a capture.
+- The sandbox accepts any OTP, except `5548` (wrong OTP) and `6648`
+  (insufficient funds), and rewrites the customer's email on its
+  transactions.
