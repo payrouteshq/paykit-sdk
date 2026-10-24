@@ -1525,8 +1525,42 @@ describe('handleWebhook', () => {
         notFound,
     });
 
+    const error = await send({
+      id: 1,
+      txRef: 'gone',
+      status: 'successful',
+    }).catch(e => e);
+
+    expect(error).toBeInstanceOf(ResourceNotFoundError);
+    expect(error).not.toBeInstanceOf(WebhookError);
+    expect(error.message).toMatch(/gone/);
+  });
+
+  it('keeps failing with an operational error when the lookup itself fails', async () => {
+    useFetch({
+      [`GET ${BASE_URL}/transactions/verify_by_reference?tx_ref=ref-1`]:
+        () => fail('Invalid secret key passed', 401),
+    });
+
+    const error = await send({
+      id: 1,
+      txRef: 'ref-1',
+      status: 'successful',
+    }).catch(e => e);
+
+    expect(error).toBeInstanceOf(OperationFailedError);
+    expect(error).not.toBeInstanceOf(ResourceNotFoundError);
+    expect(error).not.toBeInstanceOf(WebhookError);
+  });
+
+  it('rejects a charge payload that names no transaction', async () => {
+    useFetch();
+
     await expect(
-      send({ id: 1, txRef: 'gone', status: 'successful' }),
+      send({
+        event: 'charge.completed',
+        data: { status: 'successful' },
+      }),
     ).rejects.toBeInstanceOf(WebhookError);
   });
 
@@ -1571,6 +1605,30 @@ describe('handleWebhook', () => {
         status: 'completed',
         TransactionId: 9,
       }),
+    ).rejects.toBeInstanceOf(ResourceNotFoundError);
+  });
+
+  it('keeps failing with an operational error when a refund lookup fails', async () => {
+    useFetch({
+      [`GET ${BASE_URL}/transactions/9/verify`]: () =>
+        fail('Invalid secret key passed', 401),
+    });
+
+    await expect(
+      send({
+        id: 1,
+        AmountRefunded: 1,
+        status: 'completed',
+        TransactionId: 9,
+      }),
+    ).rejects.toBeInstanceOf(OperationFailedError);
+  });
+
+  it('rejects a refund payload that names no transaction', async () => {
+    useFetch();
+
+    await expect(
+      send({ id: 1, AmountRefunded: 1, status: 'completed' }),
     ).rejects.toBeInstanceOf(WebhookError);
   });
 

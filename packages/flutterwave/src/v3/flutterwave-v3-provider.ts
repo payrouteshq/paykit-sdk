@@ -1092,8 +1092,14 @@ export class FlutterwaveV3Provider
    * Verifies `verif-hash`, which Flutterwave sets to the secret hash
    * you chose in the dashboard, then maps the event. A charge or
    * refund is re-read from Flutterwave first, since a webhook is only
-   * a notification; this throws, so Flutterwave retries, when that
-   * lookup fails.
+   * a notification. A failure then has three different causes, and
+   * each throws a different error so the caller can answer correctly:
+   *
+   * - a bad `verif-hash` throws WebhookError: reject it (401).
+   * - a valid webhook for a transaction Flutterwave doesn't know throws
+   *   ResourceNotFoundError: no retry can fix it, so answer 200 or 404.
+   * - a lookup that fails (an outage, a bad key) throws
+   *   OperationFailedError: answer 5xx so Flutterwave retries.
    *
    * Flutterwave sends two shapes: `{ event, data }`, and (sandbox
    * charges and refunds) a bare legacy object. Both are accepted.
@@ -1209,14 +1215,23 @@ export class FlutterwaveV3Provider
           | FlutterwaveV3Transaction;
         const reference = 'txRef' in data ? data.txRef : data.tx_ref;
 
-        const tx = reference
-          ? await this.findTransaction(reference, 'handleWebhook')
-          : null;
+        if (!reference) {
+          throw new WebhookError(
+            `${event.type} payload has no transaction reference`,
+            { provider: this.providerName },
+          );
+        }
+
+        const tx = await this.findTransaction(
+          reference,
+          'handleWebhook',
+        );
 
         if (!tx) {
-          throw new WebhookError(
-            `Could not verify payment ${reference} for ${event.type}`,
-            { provider: this.providerName },
+          throw new ResourceNotFoundError(
+            'payment',
+            reference,
+            this.providerName,
           );
         }
 
@@ -1239,17 +1254,25 @@ export class FlutterwaveV3Provider
 
       case 'refund.completed': {
         const data = event.data as FlutterwaveV3LegacyRefundWebhook;
-        const tx = data.TransactionId
-          ? await this.findTransaction(
-              String(data.TransactionId),
-              'handleWebhook',
-            )
-          : null;
+
+        if (!data.TransactionId) {
+          throw new WebhookError(
+            `${event.type} payload has no transaction id`,
+            { provider: this.providerName },
+          );
+        }
+
+        const transactionId = String(data.TransactionId);
+        const tx = await this.findTransaction(
+          transactionId,
+          'handleWebhook',
+        );
 
         if (!tx) {
-          throw new WebhookError(
-            `Could not verify payment ${data.TransactionId} for ${event.type}`,
-            { provider: this.providerName },
+          throw new ResourceNotFoundError(
+            'payment',
+            transactionId,
+            this.providerName,
           );
         }
 
