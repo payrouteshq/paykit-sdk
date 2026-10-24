@@ -241,7 +241,6 @@ const provider = createFlutterwave({
   apiVersion: 'v3',
   secretKey: process.env.FLUTTERWAVE_SECRET_KEY, // FLWSECK_TEST-... or FLWSECK-...
   encryptionKey: process.env.FLUTTERWAVE_ENCRYPTION_KEY, // only to charge cards
-  isSandbox: true,
 });
 ```
 
@@ -256,8 +255,10 @@ FLUTTERWAVE_SANDBOX=true
 ```
 
 v3 uses one host for sandbox and live, and the key decides which you
-hit. `isSandbox` must agree with the key (`_TEST` in it), or the
-provider refuses to start.
+hit. `isSandbox` is optional and inferred from the key (`_TEST` in it
+means sandbox). If you do pass it and it contradicts the key, the
+provider refuses to start. With `flutterwave()`, leave
+`FLUTTERWAVE_SANDBOX` unset to infer it the same way.
 
 ### What maps to what
 
@@ -298,6 +299,29 @@ and `provider_metadata.redirect_url` replaces `success_url`.
 
 Flutterwave creates no transaction until the customer pays, so
 `checkouts.retrieve(id)` returns `null` before then.
+
+#### How long a checkout stays payable
+
+Flutterwave's default is short, about 15 minutes. Set how long the hosted
+checkout stays payable with `session_duration`, in minutes, and how many
+times a failed payment can be retried with `max_retry_attempt`. Both work
+on `checkouts.create` and `subscriptions.create`:
+
+```typescript
+provider_metadata: {
+  amount: 2500,
+  currency: 'NGN',
+  session_duration: 1440, // 24 hours, the most Flutterwave allows
+  max_retry_attempt: 3,
+}
+```
+
+`session_duration` must be a whole number from 1 to 1440. Anything else,
+including a longer time, throws a `ValidationError` before a request is
+made. Flutterwave itself accepts any value without complaint and doesn't
+say what it applied, so the provider doesn't pass an out-of-range value
+along. A link that must outlive 24 hours has to be re-created, for example
+by issuing a fresh checkout when the customer opens your renewal email.
 
 ### Card payments
 
@@ -435,8 +459,14 @@ for charges and refunds (seen from the sandbox). Both are handled.
 
 Every event is also emitted raw. A charge or refund is re-read from
 Flutterwave before it is reported, because a webhook is only a
-notification. If that lookup fails the handler throws, so Flutterwave
-retries.
+notification. The three ways it can fail throw three different errors, so
+your endpoint can answer each one correctly:
+
+| Cause                                                    | Error                   | Answer with                       |
+| -------------------------------------------------------- | ----------------------- | --------------------------------- |
+| Wrong or missing `verif-hash`                            | `WebhookError`          | 401, it isn't from Flutterwave    |
+| Valid webhook for a transaction Flutterwave doesn't know | `ResourceNotFoundError` | 200 or 404, retrying can't fix it |
+| The lookup failed (an outage, a bad secret key)          | `OperationFailedError`  | 5xx, so Flutterwave retries       |
 
 ### Good to know
 
@@ -445,8 +475,15 @@ retries.
 - v3 can't change a transaction's metadata, so `payments.update` only
   completes a charge with an OTP.
 - On a preauthorized charge Flutterwave replaces its `meta` on some
-  responses. The provider hides the keys it adds, but check
+  responses. The provider hides the keys it adds, and every key
+  starting with `__` (such as `__CheckoutInitAddress`), but check
   `payments.retrieve` if you rely on metadata after a capture.
 - The sandbox accepts any OTP, except `5548` (wrong OTP) and `6648`
-  (insufficient funds), and rewrites the customer's email on its
-  transactions.
+  (insufficient funds).
+- In test mode Flutterwave replaces the customer's email on its
+  transactions with your own merchant email, so `payments.retrieve`
+  won't return the email you sent. That is Flutterwave's behaviour, and
+  live mode keeps the real one.
+- The sandbox occasionally answers a card call with "An error occurred.
+  Please contact support", which succeeds on a second try. Writes aren't
+  retried for you, so retry it yourself when testing.

@@ -202,6 +202,22 @@ describe('createFlutterwave', () => {
       expect(flutterwave()).toBeInstanceOf(FlutterwaveV3Provider);
     });
 
+    it('leaves sandbox mode to the key when FLUTTERWAVE_SANDBOX is unset', () => {
+      process.env.FLUTTERWAVE_API_VERSION = 'v3';
+      process.env.FLUTTERWAVE_SECRET_KEY = 'FLWSECK-live-X';
+      delete process.env.FLUTTERWAVE_SANDBOX;
+
+      expect(flutterwave().isSandbox).toBe(false);
+    });
+
+    it('still honours FLUTTERWAVE_SANDBOX when it is set', () => {
+      process.env.FLUTTERWAVE_API_VERSION = 'v3';
+      process.env.FLUTTERWAVE_SECRET_KEY = SECRET_KEY;
+      process.env.FLUTTERWAVE_SANDBOX = 'false';
+
+      expect(() => flutterwave()).toThrow(ConfigurationError);
+    });
+
     it('names the missing variable for v3', () => {
       process.env.FLUTTERWAVE_API_VERSION = 'v3';
       delete process.env.FLUTTERWAVE_SECRET_KEY;
@@ -239,6 +255,37 @@ describe('FlutterwaveV3Provider constructor', () => {
     expect(() =>
       makeProvider({ secretKey: 'FLWSECK-live-X', isSandbox: false }),
     ).not.toThrow();
+  });
+
+  it('infers sandbox mode from the key when isSandbox is omitted', () => {
+    expect(makeProvider({ isSandbox: undefined }).isSandbox).toBe(
+      true,
+    );
+    expect(
+      makeProvider({
+        secretKey: 'FLWSECK-live-X',
+        isSandbox: undefined,
+      }).isSandbox,
+    ).toBe(false);
+  });
+
+  it('builds through createFlutterwave without isSandbox', () => {
+    const provider = createFlutterwave({
+      apiVersion: 'v3',
+      secretKey: SECRET_KEY,
+    });
+
+    expect(provider).toBeInstanceOf(FlutterwaveV3Provider);
+    expect(provider.isSandbox).toBe(true);
+  });
+
+  it('only throws when an explicit isSandbox contradicts the key', () => {
+    expect(() =>
+      makeProvider({ secretKey: 'FLWSECK-live-X', isSandbox: true }),
+    ).toThrow(/live key/);
+    expect(() => makeProvider({ isSandbox: false })).toThrow(
+      /test key/,
+    );
   });
 
   it('sends the secret key as a bearer token', async () => {
@@ -387,6 +434,114 @@ describe('createCheckout', () => {
       payment_plan: 246704,
       amount: 3000,
       redirect_url: 'https://example.com/ok',
+    });
+  });
+
+  it('sends the session length and retry limit as configuration', async () => {
+    const { bodyOf } = useFetch({
+      [`POST ${BASE_URL}/payments`]: () =>
+        ok({ link: 'https://x.test' }),
+    });
+
+    await makeProvider().createCheckout(
+      params({
+        provider_metadata: {
+          amount: 1,
+          currency: 'NGN',
+          session_duration: 1440,
+          max_retry_attempt: 3,
+        },
+      }),
+    );
+
+    expect(bodyOf('POST', '/payments').configuration).toEqual({
+      session_duration: 1440,
+      max_retry_attempt: 3,
+    });
+  });
+
+  it('sends only the option that was given', async () => {
+    const { bodyOf } = useFetch({
+      [`POST ${BASE_URL}/payments`]: () =>
+        ok({ link: 'https://x.test' }),
+    });
+
+    await makeProvider().createCheckout(
+      params({
+        provider_metadata: {
+          amount: 1,
+          currency: 'NGN',
+          session_duration: 120,
+        },
+      }),
+    );
+
+    expect(bodyOf('POST', '/payments').configuration).toEqual({
+      session_duration: 120,
+    });
+  });
+
+  it('sends no configuration at all when neither is set', async () => {
+    const { bodyOf } = useFetch({
+      [`POST ${BASE_URL}/payments`]: () =>
+        ok({ link: 'https://x.test' }),
+    });
+
+    await makeProvider().createCheckout(params());
+
+    expect(bodyOf('POST', '/payments')).not.toHaveProperty(
+      'configuration',
+    );
+  });
+
+  it.each([
+    [
+      "above Flutterwave's 1440 minute maximum",
+      { session_duration: 1441 },
+    ],
+    ['zero', { session_duration: 0 }],
+    ['negative', { session_duration: -5 }],
+    ['fractional', { session_duration: 1.5 }],
+    ['a zero retry limit', { max_retry_attempt: 0 }],
+    ['a fractional retry limit', { max_retry_attempt: 1.5 }],
+  ])('rejects %s instead of sending it', async (_name, extra) => {
+    const { fetchMock } = useFetch();
+
+    await expect(
+      makeProvider().createCheckout(
+        params({
+          provider_metadata: { amount: 1, currency: 'NGN', ...extra },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('carries the session options through createSubscription', async () => {
+    const { bodyOf } = useFetch({
+      [`GET ${BASE_URL}/payment-plans/246704`]: () => ok(plan()),
+      [`POST ${BASE_URL}/payments`]: () =>
+        ok({ link: 'https://x.test' }),
+    });
+
+    await makeProvider().createSubscription({
+      customer: { email: 'a@example.com' },
+      amount: 0,
+      currency: 'NGN',
+      item_id: '246704',
+      billing_interval: 'month',
+      metadata: null,
+      quantity: 1,
+      provider_metadata: {
+        redirect_url: 'https://example.com/ok',
+        session_duration: 600,
+        max_retry_attempt: 2,
+      },
+    });
+
+    expect(bodyOf('POST', '/payments').configuration).toEqual({
+      session_duration: 600,
+      max_retry_attempt: 2,
     });
   });
 
@@ -1519,14 +1674,48 @@ describe('handleWebhook', () => {
     });
   });
 
-  it('throws, so Flutterwave retries, when the payment cannot be verified', async () => {
+  it('says so, apart from a bad signature, when the payment is unknown', async () => {
     useFetch({
       [`GET ${BASE_URL}/transactions/verify_by_reference?tx_ref=gone`]:
         notFound,
     });
 
+    const error = await send({
+      id: 1,
+      txRef: 'gone',
+      status: 'successful',
+    }).catch(e => e);
+
+    expect(error).toBeInstanceOf(ResourceNotFoundError);
+    expect(error).not.toBeInstanceOf(WebhookError);
+    expect(error.message).toMatch(/gone/);
+  });
+
+  it('keeps failing with an operational error when the lookup itself fails', async () => {
+    useFetch({
+      [`GET ${BASE_URL}/transactions/verify_by_reference?tx_ref=ref-1`]:
+        () => fail('Invalid secret key passed', 401),
+    });
+
+    const error = await send({
+      id: 1,
+      txRef: 'ref-1',
+      status: 'successful',
+    }).catch(e => e);
+
+    expect(error).toBeInstanceOf(OperationFailedError);
+    expect(error).not.toBeInstanceOf(ResourceNotFoundError);
+    expect(error).not.toBeInstanceOf(WebhookError);
+  });
+
+  it('rejects a charge payload that names no transaction', async () => {
+    useFetch();
+
     await expect(
-      send({ id: 1, txRef: 'gone', status: 'successful' }),
+      send({
+        event: 'charge.completed',
+        data: { status: 'successful' },
+      }),
     ).rejects.toBeInstanceOf(WebhookError);
   });
 
@@ -1559,7 +1748,7 @@ describe('handleWebhook', () => {
     });
   });
 
-  it('throws for a refund on an unknown transaction', async () => {
+  it('says so when a refund is for an unknown transaction', async () => {
     useFetch({
       [`GET ${BASE_URL}/transactions/9/verify`]: notFound,
     });
@@ -1571,6 +1760,30 @@ describe('handleWebhook', () => {
         status: 'completed',
         TransactionId: 9,
       }),
+    ).rejects.toBeInstanceOf(ResourceNotFoundError);
+  });
+
+  it('keeps failing with an operational error when a refund lookup fails', async () => {
+    useFetch({
+      [`GET ${BASE_URL}/transactions/9/verify`]: () =>
+        fail('Invalid secret key passed', 401),
+    });
+
+    await expect(
+      send({
+        id: 1,
+        AmountRefunded: 1,
+        status: 'completed',
+        TransactionId: 9,
+      }),
+    ).rejects.toBeInstanceOf(OperationFailedError);
+  });
+
+  it('rejects a refund payload that names no transaction', async () => {
+    useFetch();
+
+    await expect(
+      send({ id: 1, AmountRefunded: 1, status: 'completed' }),
     ).rejects.toBeInstanceOf(WebhookError);
   });
 

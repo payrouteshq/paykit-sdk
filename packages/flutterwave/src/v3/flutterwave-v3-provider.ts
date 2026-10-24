@@ -129,6 +129,16 @@ interface FlutterwaveV3CheckoutMetadata {
   redirect_url?: string;
   /** Comma-separated payment methods to show, e.g. `card,ussd`. */
   payment_options?: string;
+  /**
+   * How long, in minutes, the hosted checkout stays payable once it is
+   * opened. A whole number from 1 to 1440 (24 hours); anything else
+   * throws a ValidationError instead of being sent, because Flutterwave
+   * accepts any value and doesn't say what it applied. Flutterwave's
+   * own default is short, about 15 minutes.
+   */
+  session_duration?: number;
+  /** How many times the customer can retry a failed payment on the checkout. */
+  max_retry_attempt?: number;
   customizations?: {
     title?: string;
     logo?: string;
@@ -142,6 +152,10 @@ interface FlutterwaveV3SubscriptionMetadata {
   redirect_url?: string;
   customer_name?: string;
   phone_number?: string;
+  /** See `session_duration` on the checkout metadata. */
+  session_duration?: number;
+  /** See `max_retry_attempt` on the checkout metadata. */
+  max_retry_attempt?: number;
 }
 
 interface FlutterwaveV3RefundMetadata {}
@@ -157,9 +171,15 @@ type PayKitFlutterwaveV3RawEvents = {
   [K in keyof FlutterwaveV3EventPayloadMap as `flutterwave.${K}`]: FlutterwaveV3EventPayloadMap[K];
 } & Record<string, any>;
 
-export interface FlutterwaveV3Options extends PaykitProviderOptions {
+export interface FlutterwaveV3Options
+  extends Omit<PaykitProviderOptions, 'isSandbox'> {
   /** Secret key from the dashboard: `FLWSECK_TEST-...` or `FLWSECK-...`. */
   secretKey: string;
+  /**
+   * Inferred from the key (`_TEST` means sandbox) when omitted. When
+   * given, it must agree with the key or the provider refuses to start.
+   */
+  isSandbox?: boolean;
   /**
    * 24-character encryption key from the dashboard. Only needed to
    * charge cards directly, since v3 requires card details encrypted.
@@ -171,7 +191,7 @@ const flutterwaveV3OptionsSchema = schema<FlutterwaveV3Options>()(
   Schema.object({
     secretKey: Schema.string(),
     encryptionKey: Schema.string().optional(),
-    isSandbox: Schema.boolean(),
+    isSandbox: Schema.boolean().optional(),
     debug: Schema.boolean().optional(),
   }),
 );
@@ -187,6 +207,9 @@ const SANDBOX_KEY_MARKER = '_TEST';
 const isNumericId = (id: string) => /^\d+$/.test(id);
 
 const MAX_SUBSCRIPTION_PAGES = 25;
+
+/** Flutterwave's documented ceiling for a hosted checkout session. */
+const MAX_SESSION_DURATION_MINUTES = 1440;
 
 export class FlutterwaveV3Provider
   extends AbstractPayKitProvider
@@ -213,13 +236,16 @@ export class FlutterwaveV3Provider
   constructor(private readonly opts: FlutterwaveV3Options) {
     super(flutterwaveV3OptionsSchema, opts, providerName);
 
-    this.isSandbox = opts.isSandbox;
+    const isTestKey = opts.secretKey.includes(SANDBOX_KEY_MARKER);
+
+    this.isSandbox = opts.isSandbox ?? isTestKey;
 
     if (
-      opts.secretKey.includes(SANDBOX_KEY_MARKER) !== this.isSandbox
+      opts.isSandbox !== undefined &&
+      opts.isSandbox !== isTestKey
     ) {
       throw new ConfigurationError(
-        this.isSandbox
+        opts.isSandbox
           ? 'isSandbox is true but secretKey is a live key (it should contain _TEST)'
           : 'isSandbox is false but secretKey is a test key',
         { provider: this.providerName, missingKeys: ['secretKey'] },
@@ -384,6 +410,55 @@ export class FlutterwaveV3Provider
     return provided ?? `pk_${crypto.randomUUID()}`;
   }
 
+  /**
+   * The hosted checkout's `configuration`, or nothing when neither
+   * option is set so Flutterwave's defaults apply.
+   */
+  private checkoutConfiguration(
+    pm: { session_duration?: number; max_retry_attempt?: number },
+    method: string,
+  ): Pick<FlutterwaveV3HostedPaymentRequest, 'configuration'> {
+    const { session_duration, max_retry_attempt } = pm;
+
+    if (
+      session_duration !== undefined &&
+      (!Number.isInteger(session_duration) ||
+        session_duration < 1 ||
+        session_duration > MAX_SESSION_DURATION_MINUTES)
+    ) {
+      throw this.validationError(
+        `session_duration must be a whole number of minutes from 1 to ${MAX_SESSION_DURATION_MINUTES}, which is Flutterwave's maximum.`,
+        method,
+        'session_duration',
+      );
+    }
+
+    if (
+      max_retry_attempt !== undefined &&
+      (!Number.isInteger(max_retry_attempt) || max_retry_attempt < 1)
+    ) {
+      throw this.validationError(
+        'max_retry_attempt must be a whole number of at least 1.',
+        method,
+        'max_retry_attempt',
+      );
+    }
+
+    if (
+      session_duration === undefined &&
+      max_retry_attempt === undefined
+    ) {
+      return {};
+    }
+
+    return {
+      configuration: {
+        ...(session_duration !== undefined && { session_duration }),
+        ...(max_retry_attempt !== undefined && { max_retry_attempt }),
+      },
+    };
+  }
+
   private paykitMeta(
     metadata: Record<string, unknown> | null | undefined,
     internal: Record<string, unknown>,
@@ -493,6 +568,7 @@ export class FlutterwaveV3Provider
         payment_options: pm.payment_options,
       }),
       ...(pm.customizations && { customizations: pm.customizations }),
+      ...this.checkoutConfiguration(pm, 'createCheckout'),
       meta: metadata,
     };
 
@@ -630,6 +706,8 @@ export class FlutterwaveV3Provider
         redirect_url: pm.redirect_url,
         customer_name: pm.customer_name,
         phone_number: pm.phone_number,
+        session_duration: pm.session_duration,
+        max_retry_attempt: pm.max_retry_attempt,
       },
     });
 
@@ -1092,8 +1170,14 @@ export class FlutterwaveV3Provider
    * Verifies `verif-hash`, which Flutterwave sets to the secret hash
    * you chose in the dashboard, then maps the event. A charge or
    * refund is re-read from Flutterwave first, since a webhook is only
-   * a notification; this throws, so Flutterwave retries, when that
-   * lookup fails.
+   * a notification. A failure then has three different causes, and
+   * each throws a different error so the caller can answer correctly:
+   *
+   * - a bad `verif-hash` throws WebhookError: reject it (401).
+   * - a valid webhook for a transaction Flutterwave doesn't know throws
+   *   ResourceNotFoundError: no retry can fix it, so answer 200 or 404.
+   * - a lookup that fails (an outage, a bad key) throws
+   *   OperationFailedError: answer 5xx so Flutterwave retries.
    *
    * Flutterwave sends two shapes: `{ event, data }`, and (sandbox
    * charges and refunds) a bare legacy object. Both are accepted.
@@ -1209,14 +1293,23 @@ export class FlutterwaveV3Provider
           | FlutterwaveV3Transaction;
         const reference = 'txRef' in data ? data.txRef : data.tx_ref;
 
-        const tx = reference
-          ? await this.findTransaction(reference, 'handleWebhook')
-          : null;
+        if (!reference) {
+          throw new WebhookError(
+            `${event.type} payload has no transaction reference`,
+            { provider: this.providerName },
+          );
+        }
+
+        const tx = await this.findTransaction(
+          reference,
+          'handleWebhook',
+        );
 
         if (!tx) {
-          throw new WebhookError(
-            `Could not verify payment ${reference} for ${event.type}`,
-            { provider: this.providerName },
+          throw new ResourceNotFoundError(
+            'payment',
+            reference,
+            this.providerName,
           );
         }
 
@@ -1239,17 +1332,25 @@ export class FlutterwaveV3Provider
 
       case 'refund.completed': {
         const data = event.data as FlutterwaveV3LegacyRefundWebhook;
-        const tx = data.TransactionId
-          ? await this.findTransaction(
-              String(data.TransactionId),
-              'handleWebhook',
-            )
-          : null;
+
+        if (!data.TransactionId) {
+          throw new WebhookError(
+            `${event.type} payload has no transaction id`,
+            { provider: this.providerName },
+          );
+        }
+
+        const transactionId = String(data.TransactionId);
+        const tx = await this.findTransaction(
+          transactionId,
+          'handleWebhook',
+        );
 
         if (!tx) {
-          throw new WebhookError(
-            `Could not verify payment ${data.TransactionId} for ${event.type}`,
-            { provider: this.providerName },
+          throw new ResourceNotFoundError(
+            'payment',
+            transactionId,
+            this.providerName,
           );
         }
 

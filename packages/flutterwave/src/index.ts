@@ -62,7 +62,9 @@ export const flutterwave = () => {
       apiVersion: 'v3',
       secretKey: envVars.FLUTTERWAVE_SECRET_KEY,
       encryptionKey: env.FLUTTERWAVE_ENCRYPTION_KEY,
-      isSandbox,
+      // Left to the key when FLUTTERWAVE_SANDBOX isn't set.
+      isSandbox:
+        env.FLUTTERWAVE_SANDBOX === undefined ? undefined : isSandbox,
     });
   }
 
