@@ -157,9 +157,15 @@ type PayKitFlutterwaveV3RawEvents = {
   [K in keyof FlutterwaveV3EventPayloadMap as `flutterwave.${K}`]: FlutterwaveV3EventPayloadMap[K];
 } & Record<string, any>;
 
-export interface FlutterwaveV3Options extends PaykitProviderOptions {
+export interface FlutterwaveV3Options
+  extends Omit<PaykitProviderOptions, 'isSandbox'> {
   /** Secret key from the dashboard: `FLWSECK_TEST-...` or `FLWSECK-...`. */
   secretKey: string;
+  /**
+   * Inferred from the key (`_TEST` means sandbox) when omitted. When
+   * given, it must agree with the key or the provider refuses to start.
+   */
+  isSandbox?: boolean;
   /**
    * 24-character encryption key from the dashboard. Only needed to
    * charge cards directly, since v3 requires card details encrypted.
@@ -171,7 +177,7 @@ const flutterwaveV3OptionsSchema = schema<FlutterwaveV3Options>()(
   Schema.object({
     secretKey: Schema.string(),
     encryptionKey: Schema.string().optional(),
-    isSandbox: Schema.boolean(),
+    isSandbox: Schema.boolean().optional(),
     debug: Schema.boolean().optional(),
   }),
 );
@@ -213,13 +219,16 @@ export class FlutterwaveV3Provider
   constructor(private readonly opts: FlutterwaveV3Options) {
     super(flutterwaveV3OptionsSchema, opts, providerName);
 
-    this.isSandbox = opts.isSandbox;
+    const isTestKey = opts.secretKey.includes(SANDBOX_KEY_MARKER);
+
+    this.isSandbox = opts.isSandbox ?? isTestKey;
 
     if (
-      opts.secretKey.includes(SANDBOX_KEY_MARKER) !== this.isSandbox
+      opts.isSandbox !== undefined &&
+      opts.isSandbox !== isTestKey
     ) {
       throw new ConfigurationError(
-        this.isSandbox
+        opts.isSandbox
           ? 'isSandbox is true but secretKey is a live key (it should contain _TEST)'
           : 'isSandbox is false but secretKey is a test key',
         { provider: this.providerName, missingKeys: ['secretKey'] },

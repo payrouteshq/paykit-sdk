@@ -202,6 +202,22 @@ describe('createFlutterwave', () => {
       expect(flutterwave()).toBeInstanceOf(FlutterwaveV3Provider);
     });
 
+    it('leaves sandbox mode to the key when FLUTTERWAVE_SANDBOX is unset', () => {
+      process.env.FLUTTERWAVE_API_VERSION = 'v3';
+      process.env.FLUTTERWAVE_SECRET_KEY = 'FLWSECK-live-X';
+      delete process.env.FLUTTERWAVE_SANDBOX;
+
+      expect(flutterwave().isSandbox).toBe(false);
+    });
+
+    it('still honours FLUTTERWAVE_SANDBOX when it is set', () => {
+      process.env.FLUTTERWAVE_API_VERSION = 'v3';
+      process.env.FLUTTERWAVE_SECRET_KEY = SECRET_KEY;
+      process.env.FLUTTERWAVE_SANDBOX = 'false';
+
+      expect(() => flutterwave()).toThrow(ConfigurationError);
+    });
+
     it('names the missing variable for v3', () => {
       process.env.FLUTTERWAVE_API_VERSION = 'v3';
       delete process.env.FLUTTERWAVE_SECRET_KEY;
@@ -239,6 +255,37 @@ describe('FlutterwaveV3Provider constructor', () => {
     expect(() =>
       makeProvider({ secretKey: 'FLWSECK-live-X', isSandbox: false }),
     ).not.toThrow();
+  });
+
+  it('infers sandbox mode from the key when isSandbox is omitted', () => {
+    expect(makeProvider({ isSandbox: undefined }).isSandbox).toBe(
+      true,
+    );
+    expect(
+      makeProvider({
+        secretKey: 'FLWSECK-live-X',
+        isSandbox: undefined,
+      }).isSandbox,
+    ).toBe(false);
+  });
+
+  it('builds through createFlutterwave without isSandbox', () => {
+    const provider = createFlutterwave({
+      apiVersion: 'v3',
+      secretKey: SECRET_KEY,
+    });
+
+    expect(provider).toBeInstanceOf(FlutterwaveV3Provider);
+    expect(provider.isSandbox).toBe(true);
+  });
+
+  it('only throws when an explicit isSandbox contradicts the key', () => {
+    expect(() =>
+      makeProvider({ secretKey: 'FLWSECK-live-X', isSandbox: true }),
+    ).toThrow(/live key/);
+    expect(() => makeProvider({ isSandbox: false })).toThrow(
+      /test key/,
+    );
   });
 
   it('sends the secret key as a bearer token', async () => {
