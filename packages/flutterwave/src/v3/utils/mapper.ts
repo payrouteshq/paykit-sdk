@@ -111,11 +111,20 @@ export const flutterwaveV3StatusToPaymentStatus = (
   }
 };
 
+/**
+ * Flutterwave adds its own bookkeeping to `meta` (such as
+ * `__CheckoutInitAddress`), always under a `__` prefix, so the PayKit
+ * key and those are dropped to leave only what the merchant sent.
+ */
 export const toPaykitMetadata = (
   meta: Record<string, unknown>,
 ): PaykitMetadata =>
   omitInternalMetadata(
-    stringifyMetadataValues(meta),
+    stringifyMetadataValues(
+      Object.fromEntries(
+        Object.entries(meta).filter(([key]) => !key.startsWith('__')),
+      ),
+    ),
   ) as PaykitMetadata;
 
 const internalMetadata = (meta: Record<string, unknown>) => {

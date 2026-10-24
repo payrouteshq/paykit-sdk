@@ -142,6 +142,24 @@ describe('Payment$fromTransaction', () => {
     expect(payment.status).toBe('requires_capture');
   });
 
+  it("drops Flutterwave's own __ keys but keeps the rest", () => {
+    const payment = Payment$fromTransaction(
+      tx({
+        meta: {
+          __CheckoutInitAddress: 'N/A',
+          __anything_else: 'x',
+          payment_id: 'pay_1',
+          order: 'o-1',
+        },
+      }),
+    );
+
+    expect(payment.metadata).toEqual({
+      payment_id: 'pay_1',
+      order: 'o-1',
+    });
+  });
+
   it('surfaces the next step while requires_action', () => {
     const payment = Payment$fromTransaction(
       tx({ status: 'pending' }),
