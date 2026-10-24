@@ -191,6 +191,11 @@ export interface FlutterwaveV3HostedPaymentRequest {
   customer: { email: string; name?: string; phone_number?: string };
   payment_plan?: number;
   payment_options?: string;
+  configuration?: {
+    /** Minutes the checkout stays payable, at most 1440. */
+    session_duration?: number;
+    max_retry_attempt?: number;
+  };
   customizations?: {
     title?: string;
     logo?: string;

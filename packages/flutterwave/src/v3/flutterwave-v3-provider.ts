@@ -129,6 +129,16 @@ interface FlutterwaveV3CheckoutMetadata {
   redirect_url?: string;
   /** Comma-separated payment methods to show, e.g. `card,ussd`. */
   payment_options?: string;
+  /**
+   * How long, in minutes, the hosted checkout stays payable once it is
+   * opened. A whole number from 1 to 1440 (24 hours); anything else
+   * throws a ValidationError instead of being sent, because Flutterwave
+   * accepts any value and doesn't say what it applied. Flutterwave's
+   * own default is short, about 15 minutes.
+   */
+  session_duration?: number;
+  /** How many times the customer can retry a failed payment on the checkout. */
+  max_retry_attempt?: number;
   customizations?: {
     title?: string;
     logo?: string;
@@ -142,6 +152,10 @@ interface FlutterwaveV3SubscriptionMetadata {
   redirect_url?: string;
   customer_name?: string;
   phone_number?: string;
+  /** See `session_duration` on the checkout metadata. */
+  session_duration?: number;
+  /** See `max_retry_attempt` on the checkout metadata. */
+  max_retry_attempt?: number;
 }
 
 interface FlutterwaveV3RefundMetadata {}
@@ -193,6 +207,9 @@ const SANDBOX_KEY_MARKER = '_TEST';
 const isNumericId = (id: string) => /^\d+$/.test(id);
 
 const MAX_SUBSCRIPTION_PAGES = 25;
+
+/** Flutterwave's documented ceiling for a hosted checkout session. */
+const MAX_SESSION_DURATION_MINUTES = 1440;
 
 export class FlutterwaveV3Provider
   extends AbstractPayKitProvider
@@ -393,6 +410,55 @@ export class FlutterwaveV3Provider
     return provided ?? `pk_${crypto.randomUUID()}`;
   }
 
+  /**
+   * The hosted checkout's `configuration`, or nothing when neither
+   * option is set so Flutterwave's defaults apply.
+   */
+  private checkoutConfiguration(
+    pm: { session_duration?: number; max_retry_attempt?: number },
+    method: string,
+  ): Pick<FlutterwaveV3HostedPaymentRequest, 'configuration'> {
+    const { session_duration, max_retry_attempt } = pm;
+
+    if (
+      session_duration !== undefined &&
+      (!Number.isInteger(session_duration) ||
+        session_duration < 1 ||
+        session_duration > MAX_SESSION_DURATION_MINUTES)
+    ) {
+      throw this.validationError(
+        `session_duration must be a whole number of minutes from 1 to ${MAX_SESSION_DURATION_MINUTES}, which is Flutterwave's maximum.`,
+        method,
+        'session_duration',
+      );
+    }
+
+    if (
+      max_retry_attempt !== undefined &&
+      (!Number.isInteger(max_retry_attempt) || max_retry_attempt < 1)
+    ) {
+      throw this.validationError(
+        'max_retry_attempt must be a whole number of at least 1.',
+        method,
+        'max_retry_attempt',
+      );
+    }
+
+    if (
+      session_duration === undefined &&
+      max_retry_attempt === undefined
+    ) {
+      return {};
+    }
+
+    return {
+      configuration: {
+        ...(session_duration !== undefined && { session_duration }),
+        ...(max_retry_attempt !== undefined && { max_retry_attempt }),
+      },
+    };
+  }
+
   private paykitMeta(
     metadata: Record<string, unknown> | null | undefined,
     internal: Record<string, unknown>,
@@ -502,6 +568,7 @@ export class FlutterwaveV3Provider
         payment_options: pm.payment_options,
       }),
       ...(pm.customizations && { customizations: pm.customizations }),
+      ...this.checkoutConfiguration(pm, 'createCheckout'),
       meta: metadata,
     };
 
@@ -639,6 +706,8 @@ export class FlutterwaveV3Provider
         redirect_url: pm.redirect_url,
         customer_name: pm.customer_name,
         phone_number: pm.phone_number,
+        session_duration: pm.session_duration,
+        max_retry_attempt: pm.max_retry_attempt,
       },
     });
 
